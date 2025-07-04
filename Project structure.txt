@@ -1,0 +1,29 @@
+/tengri-lang/
+|
+├── .gitignore          # Файл для игнорирования мусорных файлов
+├── LICENSE             # Лицензия на использование кода
+├── README.md           # Главная страница и манифест проекта
+|
+├── 01_philosophy/      # Рукопись "Тартар и Я"
+│   └── Tartarus & I.docx
+|
+├── 02_prototype_python/ # Весь код на Python
+│   ├── token.py
+│   ├── lexer.py
+│   ├── ast_nodes.py
+│   ├── parser.py
+│   ├── interpreter.py
+│   └── main.py
+|
+└── 03_compiler_go/      # Весь код на Go
+    ├── go.mod          # Главный файл Go-модуля
+    ├── go.sum
+    ├── main.go
+    ├── token/
+    │   └── token.go
+    ├── lexer/
+    │   └── lexer.go
+    ├── ast/
+    │   └── ast.go
+    └── parser/
+        └── parser.go

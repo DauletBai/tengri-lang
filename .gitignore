@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.eggs/
+*.egg-info/
+*.egg
+
+# Go
+# Compiled Object files, builds, and executables
+*.o
+*.a
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Folders
+_obj/
+_test/
+bin/
+pkg/
+
+# Go Module
+go.sum
+
+# IDEs and OS-specific
+.vscode/
+.idea/
+*.swp
+.DS_Store

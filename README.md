@@ -55,7 +55,7 @@ cd 03_compiler_go
 
 # Если вы запускаете проект впервые, инициализируйте модуль
 # (Замените [ВАШ_АККАУНТ_GITHUB] на ваше имя пользователя)
-# go mod init https://github.com/DauletBai/tengri-lang
+# go mod init github.com/DauletBai/tengri-lang
 
 # Запустите главный файл
 go run main.go
