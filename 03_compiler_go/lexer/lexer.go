@@ -5,7 +5,6 @@ import (
 	"tengri-lang/03_compiler_go/token"
 	"unicode"
 )
-
 type Lexer struct {
 	input        []rune
 	position     int
@@ -62,7 +61,8 @@ func (l *Lexer) NextToken() token.Token {
 	case '-': tok = newToken(token.Op_Minus, l.ch)
 	case '*': tok = newToken(token.Op_Multiply, l.ch)
 	case '/': tok = newToken(token.Op_Divide, l.ch)
-	case '>': tok = newToken(token.Op_Greater, l.ch) 
+	case '>': tok = newToken(token.Op_Greater, l.ch)
+	case ',': tok = newToken(token.Sep_Comma, l.ch)
 	case '(': tok = newToken(token.Sep_LParen, l.ch)
 	case ')': tok = newToken(token.Sep_RParen, l.ch)
 	case '"': // Обработка строк

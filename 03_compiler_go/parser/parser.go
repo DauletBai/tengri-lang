@@ -3,19 +3,19 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 	"tengri-lang/03_compiler_go/ast"
 	"tengri-lang/03_compiler_go/lexer"
 	"tengri-lang/03_compiler_go/token"
-	"strconv"
 )
 
 // Определение уровней приоритета операций
 const (
 	_ int = iota
 	LOWEST
-	SUM     // +
-	PRODUCT // *
-	CALL    // myFunction(X)
+	SUM
+	PRODUCT
+	CALL
 )
 
 var precedences = map[token.TokenType]int{
@@ -23,14 +23,13 @@ var precedences = map[token.TokenType]int{
 	token.Op_Minus:    SUM,
 	token.Op_Multiply: PRODUCT,
 	token.Op_Divide:   PRODUCT,
-	token.Sep_LParen:  CALL, // Для вызова функции
+	token.Sep_LParen:  CALL,
 }
 
 type (
 	prefixParseFn func() ast.Expression
 	infixParseFn  func(ast.Expression) ast.Expression
 )
-
 type Parser struct {
 	l              *lexer.Lexer
 	errors         []string
@@ -42,20 +41,19 @@ type Parser struct {
 
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l, errors: []string{}}
-
 	// Регистрируем функции для разбора префиксных выражений
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.Identifier, p.parseIdentifier)
 	p.registerPrefix(token.IntLiteral, p.parseIntegerLiteral)
-	p.registerPrefix(token.Sep_LParen, p.parseGroupedExpression) // Для выражений в скобках
-
+	p.registerPrefix(token.StringLiteral, p.parseStringLiteral)
+	p.registerPrefix(token.Sep_LParen, p.parseGroupedExpression)
 	// Регистрируем функции для разбора инфиксных выражений
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.Op_Plus, p.parseInfixExpression)
 	p.registerInfix(token.Op_Minus, p.parseInfixExpression)
 	p.registerInfix(token.Op_Multiply, p.parseInfixExpression)
 	p.registerInfix(token.Op_Divide, p.parseInfixExpression)
-	p.registerInfix(token.Sep_LParen, p.parseCallExpression) // Для вызова функции
+	p.registerInfix(token.Sep_LParen, p.parseCallExpression)
 
 	p.nextToken()
 	p.nextToken()
@@ -152,6 +150,10 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	return lit
 }
 
+func (p *Parser) parseStringLiteral() ast.Expression {
+	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal} // упрощённая реализация
+}
+
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression := &ast.InfixExpression{
 		Token:    p.curToken,
@@ -174,26 +176,27 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 }
 
 func (p *Parser) parseFunctionDefinition() ast.Statement {
-    fd := &ast.FunctionDefinition{Token: p.curToken}
-
-    if !p.expectPeek(token.Identifier) {
-        return nil
-    }
-    fd.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-
-    if !p.expectPeek(token.Sep_LParen) {
-        return nil
-    }
-    fd.Parameters = p.parseFunctionParameters()
-
-    if !p.expectPeek(token.Sep_LParen) {
-        return nil
-    }
-    fd.Body = p.parseBlockStatement()
-
-    return fd
+	fd := &ast.FunctionDefinition{Token: p.curToken}
+	if !p.expectPeek(token.Identifier) {
+		return nil
+	}
+	fd.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	if !p.expectPeek(token.Sep_LParen) {
+		return nil
+	}
+	fd.Parameters = p.parseFunctionParameters()
+	if !p.expectPeek(token.Sep_LParen) {
+		return nil
+	}
+	fd.Body = p.parseBlockStatement()
+	return fd
 }
 
+func isTypeToken(t token.TokenType) bool {
+	return t == token.Runa_Type_Int || t == token.Runa_Type_Float ||
+		t == token.Runa_Type_Str || t == token.Runa_Type_Char ||
+		t == token.Runa_Type_Collection
+}
 
 func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 	params := []*ast.Parameter{}
@@ -202,38 +205,32 @@ func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 		p.nextToken()
 		return params
 	}
-	p.nextToken()
 
-	// Parse first parameter
-	param := &ast.Parameter{Token: p.curToken}
-	if !p.curTokenIs(token.Runa_Type_Int) { // TODO: Add all types
-		p.errors = append(p.errors, "ожидался тип параметра □")
-		return nil
-	}
-	if !p.expectPeek(token.Identifier) {
-		return nil
-	}
-	param.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	params = append(params, param)
+	for {
+		p.nextToken()
 
-	// Parse subsequent parameters
-	for p.peekTokenIs(token.Sep_Comma) {
-		p.nextToken()
-		p.nextToken()
-		param := &ast.Parameter{Token: p.curToken}
-		if !p.curTokenIs(token.Runa_Type_Int) { // TODO: Add all types
+		if !p.curTokenIs(token.Runa_Type_Int) {
+			p.errors = append(p.errors, fmt.Sprintf("ожидался тип параметра (например, □), но получен %s", p.curToken.Type))
 			return nil
 		}
+		param := &ast.Parameter{Token: p.curToken}
+
 		if !p.expectPeek(token.Identifier) {
 			return nil
 		}
 		param.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 		params = append(params, param)
-	}
 
+		if !p.peekTokenIs(token.Sep_Comma) {
+			break
+		}
+		p.nextToken() // пропустить запятую
+	}
+	
 	if !p.expectPeek(token.Sep_RParen) {
 		return nil
 	}
+
 	return params
 }
 
@@ -260,38 +257,33 @@ func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
 
 func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 	list := []ast.Expression{}
-
 	if p.peekTokenIs(end) {
 		p.nextToken()
 		return list
 	}
 	p.nextToken()
 	list = append(list, p.parseExpression(LOWEST))
-
 	for p.peekTokenIs(token.Sep_Comma) {
 		p.nextToken()
 		p.nextToken()
 		list = append(list, p.parseExpression(LOWEST))
 	}
-
 	if !p.expectPeek(end) {
 		return nil
 	}
 	return list
 }
 
-func (p *Parser) curTokenIs(t token.TokenType) bool { return p.curToken.Type == t }
-
+func (p *Parser) curTokenIs(t token.TokenType) bool  { return p.curToken.Type == t }
 func (p *Parser) peekTokenIs(t token.TokenType) bool { return p.peekToken.Type == t }
 
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
 		return true
-	} else {
-		p.peekError(t)
-		return false
 	}
+	p.peekError(t)
+	return false
 }
 
 func (p *Parser) peekError(t token.TokenType) {
