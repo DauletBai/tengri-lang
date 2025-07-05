@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"tengri-lang/03_compiler_go/lexer"
 	"tengri-lang/03_compiler_go/parser"
+	"tengri-lang/03_compiler_go/evaluator"
+	"tengri-lang/03_compiler_go/object"
 )
 
 func main() {
@@ -27,6 +29,16 @@ func main() {
 		return
 	}
 
-	fmt.Println("--- Древо Мысли (AST) ---")
+	fmt.Println("--- AST ---")
 	fmt.Println(program.String())
+
+	env := object.NewEnvironment()
+	result := evaluator.Eval(program, env)
+
+	fmt.Println("--- Результат ---")
+	if result != nil {
+		fmt.Println(result.Inspect())
+	} else {
+		fmt.Println("null")
+	}
 }
