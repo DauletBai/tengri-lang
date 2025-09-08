@@ -49,11 +49,10 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefix(token.IntLiteral, p.parseIntegerLiteral)
 	p.registerPrefix(token.Sep_LParen, p.parseGroupedExpression)
 	p.registerPrefix(token.StringLiteral, p.parseStringLiteral)
-	// --- ИСПРАВЛЕНО: Регистрация всех необходимых функций ---
+
 	p.registerPrefix(token.Runa_If, p.parseIfExpression)
 	p.registerPrefix(token.Runa_True, p.parseBoolean)
 	p.registerPrefix(token.Runa_False, p.parseBoolean)
-	// ----------------------------------------------------
 
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.Op_Plus, p.parseInfixExpression)
@@ -87,25 +86,24 @@ func (p *Parser) parseIfExpression() ast.Expression {
 func (p *Parser) parseBoolean() ast.Expression {
 	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.Runa_True)}
 }
-// ---------------------------------------------
 
 func (p *Parser) Errors() []string { return p.errors }
 func (p *Parser) nextToken()       { p.curToken = p.peekToken; p.peekToken = p.l.NextToken() }
 
 func (p *Parser) ParseProgram() *ast.Program {
-	program := &ast.Program{Statements: []ast.Statement{}}
-	for !p.curTokenIs(token.EOF) {
-		if p.curTokenIs(token.SEMICOLON) { // '⁞'
-			p.nextToken()
-			continue
-		}
-		stmt := p.parseStatement()
-		if stmt != nil {
-			program.Statements = append(program.Statements, stmt)
-		}
-		p.nextToken()
-	}
-	return program
+    program := &ast.Program{Statements: []ast.Statement{}}
+    for !p.curTokenIs(token.EOF) {
+        if p.curTokenIs(token.SEMICOLON) { 
+            p.nextToken()
+            continue
+        }
+        stmt := p.parseStatement()
+        if stmt != nil {
+            program.Statements = append(program.Statements, stmt)
+        }
+        p.nextToken()
+    }
+    return program
 }
 
 func (p *Parser) parseStatement() ast.Statement {
@@ -296,10 +294,10 @@ func (p *Parser) parseFunctionParameters() []*ast.Parameter {
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
     block := &ast.BlockStatement{Token: p.curToken}
-    p.nextToken() 
 
+    p.nextToken() 
     for !p.curTokenIs(token.Sep_RParen) && !p.curTokenIs(token.EOF) {
-        if p.curTokenIs(token.SEMICOLON) { // '⁞'
+        if p.curTokenIs(token.SEMICOLON) { 
             p.nextToken()
             continue
         }
@@ -387,13 +385,3 @@ func isTypeToken(t token.TokenType) bool {
 func (p *Parser) parseStringLiteral() ast.Expression {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 }
-
-// ... a new type added to ast.go for strings
-type StringLiteral struct {
-	Token token.Token
-	Value string
-}
-
-func (sl *StringLiteral) expressionNode() {}
-func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
-func (sl *StringLiteral) String() string { return sl.Token.Literal }

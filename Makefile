@@ -17,5 +17,8 @@ bench: go-native tengri python
 bench-fast:
 	@go run tools/benchfast/main.go
 
+bench-plot:
+	@go run tools/benchfast/main.go --plot
+
 clean:
 	rm -f 03_compiler_go/.tmp_fib_ascii.tg
