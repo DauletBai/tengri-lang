@@ -1,0 +1,10 @@
+task,target,n,time,status,output
+fib_rec,go,30,0.014181,OK,832040
+fib_rec,tengri-ast,30,0.077198,ERR,"	не найдена функция для разбора токена ')'"
+fib_rec,python,30,0.244123,OK,832040
+fib_rec,go,32,0.016919,OK,2178309
+fib_rec,tengri-ast,32,0.068401,ERR,"	не найдена функция для разбора токена ')'"
+fib_rec,python,32,0.531255,OK,2178309
+fib_rec,go,34,0.035922,OK,5702887
+fib_rec,tengri-ast,34,0.068088,ERR,"	не найдена функция для разбора токена ')'"
+fib_rec,python,34,1.344380,OK,5702887

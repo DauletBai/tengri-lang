@@ -22,3 +22,14 @@ bench-plot:
 
 clean:
 	rm -f 03_compiler_go/.tmp_fib_ascii.tg
+
+bench-fast:
+	@go run tools/benchfast/main.go
+
+bench-plot:
+	@go run tools/benchfast/main.go --plot
+
+bench-commit:
+	@go run tools/benchfast/main.go --plot
+	@git add benchmarks
+	@git commit -m "bench: $(shell date +%Y-%m-%dT%H:%M:%S) run saved under benchmarks/runs and updated benchmarks/latest" || true

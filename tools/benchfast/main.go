@@ -19,12 +19,12 @@ import (
 )
 
 type Case struct {
-	Task   string   // "fib_rec" | "fib_iter"
-	Target string   // "go" | "python" | "tengri-ast" | "vm"
-	Cmd    []string // команда запуска (путь к бинарнику или интерпретатор + скрипт)
-	Env    []string // доп. переменные окружения
-	Dir    string   // рабочая директория
-	N      int      // размер входа
+	Task   string
+	Target string
+	Cmd    []string
+	Env    []string
+	Dir    string
+	N      int
 }
 
 func runCase(c Case) (time.Duration, string, error) {
@@ -44,12 +44,23 @@ func runCase(c Case) (time.Duration, string, error) {
 	return dur, strings.TrimSpace(out.String()), err
 }
 
-// ───────────────────────────────────────────────────────────────
-// Генерация скриптов для Tengri (круглые блоки, без while)
-// ───────────────────────────────────────────────────────────────
+func parseInlineTime(out string) (float64, bool) {
+	// Ищем строку вида: TIME: <float>
+	lines := strings.Split(out, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(line, "TIME:") {
+			val := strings.TrimSpace(strings.TrimPrefix(line, "TIME:"))
+			if f, err := strconv.ParseFloat(val, 64); err == nil && f >= 0 {
+				return f, true
+			}
+		}
+	}
+	return 0, false
+}
 
+// ── Генерация Tengri-скрипта (рекурсивный fib, круглые блоки)
 func writeTengriScriptRec(n int) (string, error) {
-	// Рекурсивный fib, совместимый с вашим парсером (круглые блоки)
 	s := fmt.Sprintf(`let fib = fn(n) (
   if (n < 2) ( return n; )
   return fib(n - 1) + fib(n - 2);
@@ -65,21 +76,46 @@ fib(n);
 	return tmp, nil
 }
 
-// ───────────────────────────────────────────────────────────────
-// Инфраструктура: директории, CSV, печать таблиц, build
-// ───────────────────────────────────────────────────────────────
+type dirs struct {
+	repoRoot    string
+	tengriDir   string
+	runsRoot    string
+	latestRoot  string
+	runStamp    string
+	runResults  string
+	runPlots    string
+	latestRes   string
+	latestPlots string
+	binDir      string
+}
 
-func ensureDirs() (repoRoot, tengriDir, resultsDir, plotsDir, binDir string, err error) {
-	repoRoot, err = os.Getwd()
+func ensureDirs() (d dirs, err error) {
+	d.repoRoot, err = os.Getwd()
 	if err != nil {
 		return
 	}
-	tengriDir = filepath.Join(repoRoot, "03_compiler_go")
-	resultsDir = filepath.Join(repoRoot, "benchmarks", "results")
-	plotsDir = filepath.Join(repoRoot, "benchmarks", "plots")
-	binDir = filepath.Join(repoRoot, ".bin")
-	for _, d := range []string{resultsDir, plotsDir, binDir} {
-		if mkErr := os.MkdirAll(d, 0o755); mkErr != nil && err == nil {
+	d.tengriDir = filepath.Join(d.repoRoot, "03_compiler_go")
+
+	d.runStamp = time.Now().Format("20060102-150405")
+
+	bmarks := filepath.Join(d.repoRoot, "benchmarks")
+	d.runsRoot = filepath.Join(bmarks, "runs", d.runStamp)
+	d.latestRoot = filepath.Join(bmarks, "latest")
+
+	d.runResults = filepath.Join(d.runsRoot, "results")
+	d.runPlots = filepath.Join(d.runsRoot, "plots")
+	d.latestRes = filepath.Join(d.latestRoot, "results")
+	d.latestPlots = filepath.Join(d.latestRoot, "plots")
+
+	d.binDir = filepath.Join(d.repoRoot, ".bin")
+
+	for _, p := range []string{
+		filepath.Join(d.repoRoot, "benchmarks", "runs"),
+		d.runsRoot, d.runResults, d.runPlots,
+		d.latestRoot, d.latestRes, d.latestPlots,
+		d.binDir,
+	} {
+		if mkErr := os.MkdirAll(p, 0o755); mkErr != nil && err == nil {
 			err = mkErr
 		}
 	}
@@ -111,9 +147,13 @@ func writeCSVRow(path string, row []string) error {
 	return w.Error()
 }
 
-// ───────────────────────────────────────────────────────────────
-// Детектор статуса: честно помечаем tengri-ast как ERR по тексту
-// ───────────────────────────────────────────────────────────────
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o644)
+}
 
 func markStatus(target, out string, err error) string {
 	if err != nil {
@@ -127,10 +167,6 @@ func markStatus(target, out string, err error) string {
 	}
 	return "OK"
 }
-
-// ───────────────────────────────────────────────────────────────
-// Build cache: собираем один раз бинарники, потом запускаем
-// ───────────────────────────────────────────────────────────────
 
 func runBuild(cmd []string, dir string) error {
 	c := exec.Command(cmd[0], cmd[1:]...)
@@ -158,20 +194,9 @@ func ensureBuiltGo(binPath string, buildTags []string, src string, repoRoot stri
 }
 
 func ensureBuiltDir(binPath string, srcDir string, repoRoot string) (string, error) {
-	if _, err := os.Stat(binPath); err == nil {
-		return binPath, nil
-	}
-	// go build ./<dir>
-	args := []string{"build", "-o", binPath, srcDir}
-	if err := runBuild(append([]string{"go"}, args...), repoRoot); err != nil {
-		return "", err
-	}
-	return binPath, nil
+	// Отключим «optional build tengri» чтобы не шумел логом
+	return "", fmt.Errorf("skip optional build")
 }
-
-// ───────────────────────────────────────────────────────────────
-// Plotting (gonum/plot)
-// ───────────────────────────────────────────────────────────────
 
 type rec struct {
 	task   string
@@ -194,7 +219,7 @@ func loadCSV(path string) ([]rec, error) {
 	}
 	var out []rec
 	for i, row := range rows {
-		if i == 0 { // header
+		if i == 0 {
 			continue
 		}
 		if len(row) < 6 {
@@ -234,7 +259,6 @@ func nsSorted(recs []rec) []int {
 	for k := range set {
 		out = append(out, k)
 	}
-	// простой insertion sort для маленького множества
 	for i := 1; i < len(out); i++ {
 		for j := i; j > 0 && out[j-1] > out[j]; j-- {
 			out[j-1], out[j] = out[j], out[j-1]
@@ -292,128 +316,136 @@ func plotFromCSV(csvPath, pngPath, title string) error {
 	return nil
 }
 
-// ───────────────────────────────────────────────────────────────
-
 func main() {
-	plotFlag := flag.Bool("plot", false, "Render plots to benchmarks/plots/*.png using gonum/plot")
+	plotFlag := flag.Bool("plot", false, "Render plots to benchmarks/{runs/<ts>|latest}/plots/*.png")
 	flag.Parse()
 
-	repoRoot, tengriDir, resultsDir, plotsDir, binDir, err := ensureDirs()
+	D, err := ensureDirs()
 	if err != nil {
 		fmt.Println("init error:", err)
 		return
 	}
 
-	// Быстрые наборы N
-	NsRec := []int{30, 32, 34}  // рекурсивные (малые)
-	NsIter := []int{30, 35, 40} // итеративные (чтобы не ждать)
+	// Наборы N (оставим в безопасной зоне int8 для VM demo и достаточной нагрузке)
+	NsRec := []int{30, 32, 34}
+	NsIter := []int{40, 60, 90}
 
-	// Пути к исходникам
-	goFibArg := filepath.Join(repoRoot, "04_benchmarks", "fibonacci_arg.go")   // рекурсивный (Go, build tag: arg)
-	goFibIter := filepath.Join(repoRoot, "04_benchmarks", "fibonacci_iter.go") // итеративный (Go, build tag: iter)
-	pyFibArg := filepath.Join(repoRoot, "04_benchmarks", "fibonacci_arg.py")   // рекурсивный (Py)
-	pyFibIter := filepath.Join(repoRoot, "04_benchmarks", "fibonacci_iter.py") // итеративный (Py)
-	vmSrc := filepath.Join(repoRoot, "05_vm_mini", "main.go")                  // VM (Go)
-	tengriSrcDir := filepath.Join(repoRoot, "03_compiler_go")                  // интерпретатор Tengri
+	goFibArg := filepath.Join(D.repoRoot, "04_benchmarks", "fibonacci_arg.go")
+	goFibIter := filepath.Join(D.repoRoot, "04_benchmarks", "fibonacci_iter.go")
+	pyFibArg := filepath.Join(D.repoRoot, "04_benchmarks", "fibonacci_arg.py")
+	pyFibIter := filepath.Join(D.repoRoot, "04_benchmarks", "fibonacci_iter.py")
+	vmSrc := filepath.Join(D.repoRoot, "05_vm_mini", "main.go")
+	tengriSrcDir := filepath.Join(D.repoRoot, "03_compiler_go")
 
-	// Пути к бинарникам (кэш сборки)
-	goRecBin := filepath.Join(binDir, "fib_rec_go")
-	goIterBin := filepath.Join(binDir, "fib_iter_go")
-	vmBin := filepath.Join(binDir, "vm")
-	tengriBin := filepath.Join(binDir, "tengri")
+	goRecBin := filepath.Join(D.binDir, "fib_rec_go")
+	goIterBin := filepath.Join(D.binDir, "fib_iter_go")
+	vmBin := filepath.Join(D.binDir, "vm")
+	// tengri как бинарник не собираем (шумело в логе), сразу run .
+	_, _ = tengriSrcDir, vmSrc
 
-	// Сборка бинарников (если их нет)
-	if _, err := ensureBuiltGo(goRecBin, []string{"arg"}, goFibArg, repoRoot); err != nil {
+	if _, err := ensureBuiltGo(goRecBin, []string{"arg"}, goFibArg, D.repoRoot); err != nil {
 		fmt.Println("build go(rec):", err)
 	}
-	if _, err := ensureBuiltGo(goIterBin, []string{"iter"}, goFibIter, repoRoot); err != nil {
+	if _, err := ensureBuiltGo(goIterBin, []string{"iter"}, goFibIter, D.repoRoot); err != nil {
 		fmt.Println("build go(iter):", err)
 	}
-	if _, err := ensureBuiltGo(vmBin, nil, vmSrc, repoRoot); err != nil {
+	if _, err := ensureBuiltGo(vmBin, nil, vmSrc, D.repoRoot); err != nil {
 		fmt.Println("build vm:", err)
 	}
-	// Попробуем собрать интерпретатор Tengri (если проект позволяет). Если не соберётся — benchfast будет делать go run .
-	if _, err := ensureBuiltDir(tengriBin, tengriSrcDir, repoRoot); err != nil {
-		fmt.Println("build tengri (optional):", err)
-	}
 
-	// CSV файлы
-	fibRecCSV := filepath.Join(resultsDir, "fib_rec.csv")
-	fibIterCSV := filepath.Join(resultsDir, "fib_iter.csv")
+	// CSV (run + latest)
+	fibRecCSV := filepath.Join(D.runResults, "fib_rec.csv")
+	fibIterCSV := filepath.Join(D.runResults, "fib_iter.csv")
 	_ = writeCSVHeader(fibRecCSV)
 	_ = writeCSVHeader(fibIterCSV)
 
-	// ─────────────── fib_rec ───────────────
+	fibRecLatest := filepath.Join(D.latestRes, "fib_rec.csv")
+	fibIterLatest := filepath.Join(D.latestRes, "fib_iter.csv")
+	_ = writeCSVHeader(fibRecLatest)
+	_ = writeCSVHeader(fibIterLatest)
+
+	// ── fib_rec
 	for _, N := range NsRec {
-		// подготовим скрипт для Tengri
 		scriptRec, err := writeTengriScriptRec(N)
 		if err != nil {
 			fmt.Println("prep-rec error:", err)
 			continue
 		}
-		tableHeader("fib_rec", N)
-
-		// Prefer running tengri as a built binary; if it doesn't exist, fallback to `go run .`
-		tengriCmd := []string{}
-		if info, err := os.Stat(tengriBin); err == nil && info.Mode().Perm()&0o111 != 0 {
-			tengriCmd = []string{tengriBin}
-		} else {
-			tengriCmd = []string{"go", "run", "."}
-		}
+		fmt.Printf("\nTask = %s, N = %d\n", "fib_rec", N)
+		fmt.Println("──────────────────────────────────────────────────────────────")
+		fmt.Printf("%-20s  %-10s  %s\n", "Target", "Time (s)", "Output")
+		fmt.Println(strings.Repeat("-", 66))
 
 		tests := []Case{
-			{Task: "fib_rec", Target: "go",         Cmd: []string{goRecBin, fmt.Sprintf("%d", N)},                               Dir: repoRoot,  N: N},
-			{Task: "fib_rec", Target: "tengri-ast", Cmd: tengriCmd, Env: []string{"TENGRI_SCRIPT=" + scriptRec},                Dir: tengriDir, N: N},
-			{Task: "fib_rec", Target: "python",     Cmd: []string{"python3", pyFibArg, fmt.Sprintf("%d", N)},                    Dir: repoRoot,  N: N},
+			{Task: "fib_rec", Target: "go",         Cmd: []string{goRecBin, fmt.Sprintf("%d", N)},                               Dir: D.repoRoot,  N: N},
+			{Task: "fib_rec", Target: "tengri-ast", Cmd: []string{"go", "run", "."}, Env: []string{"TENGRI_SCRIPT=" + scriptRec}, Dir: D.tengriDir, N: N},
+			{Task: "fib_rec", Target: "python",     Cmd: []string{"python3", pyFibArg, fmt.Sprintf("%d", N)},                     Dir: D.repoRoot,  N: N},
 		}
-
 		for _, t := range tests {
 			d, out, err := runCase(t)
 			status := markStatus(t.Target, out, err)
+			// если есть TIME:, берём внутреннее время, иначе wall-clock
+			itime, ok := parseInlineTime(out)
+			use := d.Seconds()
+			if ok {
+				use = itime
+			}
 			last := ""
 			if parts := strings.Split(out, "\n"); len(parts) > 0 {
 				last = parts[len(parts)-1]
 			}
-			fmt.Printf("%-20s  %8.3f  [%s] %s\n", t.Target, d.Seconds(), status, last)
-			_ = writeCSVRow(fibRecCSV, []string{t.Task, t.Target, fmt.Sprintf("%d", t.N), fmt.Sprintf("%.6f", d.Seconds()), status, last})
+			fmt.Printf("%-20s  %8.6f  [%s] %s\n", t.Target, use, status, last)
+			_ = writeCSVRow(fibRecCSV, []string{t.Task, t.Target, fmt.Sprintf("%d", t.N), fmt.Sprintf("%.6f", use), status, last})
+			_ = writeCSVRow(fibRecLatest, []string{t.Task, t.Target, fmt.Sprintf("%d", t.N), fmt.Sprintf("%.6f", use), status, last})
 		}
 	}
 
-	// ─────────────── fib_iter ───────────────
+	// ── fib_iter
 	for _, N := range NsIter {
-		tableHeader("fib_iter", N)
+		fmt.Printf("\nTask = %s, N = %d\n", "fib_iter", N)
+		fmt.Println("──────────────────────────────────────────────────────────────")
+		fmt.Printf("%-20s  %-10s  %s\n", "Target", "Time (s)", "Output")
+		fmt.Println(strings.Repeat("-", 66))
 		tests := []Case{
-			{Task: "fib_iter", Target: "go",     Cmd: []string{goIterBin, fmt.Sprintf("%d", N)}, Dir: repoRoot, N: N},
-			{Task: "fib_iter", Target: "python", Cmd: []string{"python3", pyFibIter, fmt.Sprintf("%d", N)}, Dir: repoRoot, N: N},
-			{Task: "fib_iter", Target: "vm",     Cmd: []string{vmBin, fmt.Sprintf("%d", N)},     Dir: repoRoot, N: N},
+			{Task: "fib_iter", Target: "go",     Cmd: []string{goIterBin, fmt.Sprintf("%d", N)},                 Dir: D.repoRoot, N: N},
+			{Task: "fib_iter", Target: "python", Cmd: []string{"python3", pyFibIter, fmt.Sprintf("%d", N)},      Dir: D.repoRoot, N: N},
+			{Task: "fib_iter", Target: "vm",     Cmd: []string{vmBin, fmt.Sprintf("%d", N)},                      Dir: D.repoRoot, N: N},
 		}
 		for _, t := range tests {
 			d, out, err := runCase(t)
 			status := markStatus(t.Target, out, err)
+			itime, ok := parseInlineTime(out)
+			use := d.Seconds()
+			if ok {
+				use = itime
+			}
 			last := ""
 			if parts := strings.Split(out, "\n"); len(parts) > 0 {
 				last = parts[len(parts)-1]
 			}
-			fmt.Printf("%-20s  %8.3f  [%s] %s\n", t.Target, d.Seconds(), status, last)
-			_ = writeCSVRow(fibIterCSV, []string{t.Task, t.Target, fmt.Sprintf("%d", t.N), fmt.Sprintf("%.6f", d.Seconds()), status, last})
+			fmt.Printf("%-20s  %8.6f  [%s] %s\n", t.Target, use, status, last)
+			_ = writeCSVRow(fibIterCSV, []string{t.Task, t.Target, fmt.Sprintf("%d", t.N), fmt.Sprintf("%.6f", use), status, last})
+			_ = writeCSVRow(fibIterLatest, []string{t.Task, t.Target, fmt.Sprintf("%d", t.N), fmt.Sprintf("%.6f", use), status, last})
 		}
 	}
 
-	fmt.Printf("\nCSV saved:\n- %s\n- %s\n", fibRecCSV, fibIterCSV)
+	fmt.Printf("\nCSV saved (run %s):\n- %s\n- %s\n", D.runStamp, filepath.Join(D.runResults, "fib_rec.csv"), filepath.Join(D.runResults, "fib_iter.csv"))
+	fmt.Printf("CSV saved (latest):\n- %s\n- %s\n", filepath.Join(D.latestRes, "fib_rec.csv"), filepath.Join(D.latestRes, "fib_iter.csv"))
 
-	// ─────────────── Графики ───────────────
 	if *plotFlag {
-		recPNG := filepath.Join(plotsDir, "fib_rec.png")
-		iterPNG := filepath.Join(plotsDir, "fib_iter.png")
-		if err := plotFromCSV(fibRecCSV, recPNG, "Fibonacci (recursive)"); err != nil {
+		recPNG := filepath.Join(D.runPlots, "fib_rec.png")
+		iterPNG := filepath.Join(D.runPlots, "fib_iter.png")
+		if err := plotFromCSV(filepath.Join(D.runResults, "fib_rec.csv"), recPNG, "Fibonacci (recursive)"); err != nil {
 			fmt.Println("plot fib_rec:", err)
 		} else {
 			fmt.Println("plot saved:", recPNG)
+			_ = copyFile(recPNG, filepath.Join(D.latestPlots, "fib_rec.png"))
 		}
-		if err := plotFromCSV(fibIterCSV, iterPNG, "Fibonacci (iterative)"); err != nil {
+		if err := plotFromCSV(filepath.Join(D.runResults, "fib_iter.csv"), iterPNG, "Fibonacci (iterative, mod M)"); err != nil {
 			fmt.Println("plot fib_iter:", err)
 		} else {
 			fmt.Println("plot saved:", iterPNG)
+			_ = copyFile(iterPNG, filepath.Join(D.latestPlots, "fib_iter.png"))
 		}
 	}
 }
