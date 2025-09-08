@@ -3,19 +3,35 @@ package main
 
 import (
 	"fmt"
-	"tengri-lang/03_compiler_go/lexer"
-	"tengri-lang/03_compiler_go/parser"
+	"os"
+	"io/ioutil"
 	"tengri-lang/03_compiler_go/evaluator"
+	"tengri-lang/03_compiler_go/lexer"
 	"tengri-lang/03_compiler_go/object"
+	"tengri-lang/03_compiler_go/parser"
 )
 
+func loadScriptFromEnv() (string, bool) {
+    path := os.Getenv("TENGRI_SCRIPT")
+    if path == "" {
+        return "", false
+    }
+    b, err := os.ReadFile(path)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "cannot read %s: %v\n", path, err)
+        return "", false
+    }
+    return string(b), true
+}
+
 func main() {
-	input := `
-        Π qosw (□ a, □ b) (
-            → a + b
-        )
-        Λ x : qosw(5, 10)
-    `
+	// Читаем код из файла для бенчмарка
+	inputBytes, err := ioutil.ReadFile("../04_benchmarks/fibonacci.tengri")
+	if err != nil {
+		fmt.Printf("Ошибка чтения файла: %s\n", err)
+		return
+	}
+	input := string(inputBytes)
 
 	l := lexer.New(input)
 	p := parser.New(l)
@@ -29,16 +45,10 @@ func main() {
 		return
 	}
 
-	fmt.Println("--- AST ---")
-	fmt.Println(program.String())
-
 	env := object.NewEnvironment()
 	result := evaluator.Eval(program, env)
 
-	fmt.Println("--- Результат ---")
 	if result != nil {
-		fmt.Println(result.Inspect())
-	} else {
-		fmt.Println("null")
+		fmt.Println(result.Inspect()) // Выводим результат вычислений
 	}
 }

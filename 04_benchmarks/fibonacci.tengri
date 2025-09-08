@@ -1,0 +1,10 @@
+// fibonacci.tengri
+Π fib (□ n) (
+    Y n > 2 (
+        → fib(n - 1) + fib(n - 2)
+    )
+    → 1
+)
+
+Λ result : fib(35) // Начнем с 35, чтобы было заметно
+⁞ result

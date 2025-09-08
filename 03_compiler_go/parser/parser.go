@@ -9,10 +9,11 @@ import (
 	"tengri-lang/03_compiler_go/token"
 )
 
-// Определение уровней приоритета операций
 const (
 	_ int = iota
 	LOWEST
+	EQUALS
+	LESSGREATER
 	SUM
 	PRODUCT
 	CALL
@@ -23,6 +24,7 @@ var precedences = map[token.TokenType]int{
 	token.Op_Minus:    SUM,
 	token.Op_Multiply: PRODUCT,
 	token.Op_Divide:   PRODUCT,
+	token.Op_Greater:  LESSGREATER,
 	token.Sep_LParen:  CALL,
 }
 
@@ -30,6 +32,7 @@ type (
 	prefixParseFn func() ast.Expression
 	infixParseFn  func(ast.Expression) ast.Expression
 )
+
 type Parser struct {
 	l              *lexer.Lexer
 	errors         []string
@@ -41,18 +44,23 @@ type Parser struct {
 
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l, errors: []string{}}
-	// Регистрируем функции для разбора префиксных выражений
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.Identifier, p.parseIdentifier)
 	p.registerPrefix(token.IntLiteral, p.parseIntegerLiteral)
-	p.registerPrefix(token.StringLiteral, p.parseStringLiteral)
 	p.registerPrefix(token.Sep_LParen, p.parseGroupedExpression)
-	// Регистрируем функции для разбора инфиксных выражений
+	p.registerPrefix(token.StringLiteral, p.parseStringLiteral)
+	// --- ИСПРАВЛЕНО: Регистрация всех необходимых функций ---
+	p.registerPrefix(token.Runa_If, p.parseIfExpression)
+	p.registerPrefix(token.Runa_True, p.parseBoolean)
+	p.registerPrefix(token.Runa_False, p.parseBoolean)
+	// ----------------------------------------------------
+
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
 	p.registerInfix(token.Op_Plus, p.parseInfixExpression)
 	p.registerInfix(token.Op_Minus, p.parseInfixExpression)
 	p.registerInfix(token.Op_Multiply, p.parseInfixExpression)
 	p.registerInfix(token.Op_Divide, p.parseInfixExpression)
+	p.registerInfix(token.Op_Greater, p.parseInfixExpression)
 	p.registerInfix(token.Sep_LParen, p.parseCallExpression)
 
 	p.nextToken()
@@ -60,12 +68,37 @@ func New(l *lexer.Lexer) *Parser {
 	return p
 }
 
+// --- ИСПРАВЛЕНО: Добавлена недостающая функция ---
+func (p *Parser) parseIfExpression() ast.Expression {
+	expression := &ast.IfExpression{Token: p.curToken}
+	p.nextToken()
+	expression.Condition = p.parseExpression(LOWEST)
+
+	if !p.expectPeek(token.Sep_LParen) {
+		return nil
+	}
+	expression.Consequence = p.parseBlockStatement()
+	
+	// Здесь можно будет добавить обработку `AITPESE` (else) в будущем
+
+	return expression
+}
+
+func (p *Parser) parseBoolean() ast.Expression {
+	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.Runa_True)}
+}
+// ---------------------------------------------
+
 func (p *Parser) Errors() []string { return p.errors }
 func (p *Parser) nextToken()       { p.curToken = p.peekToken; p.peekToken = p.l.NextToken() }
 
 func (p *Parser) ParseProgram() *ast.Program {
 	program := &ast.Program{Statements: []ast.Statement{}}
 	for !p.curTokenIs(token.EOF) {
+		if p.curTokenIs(token.SEMICOLON) { // '⁞'
+			p.nextToken()
+			continue
+		}
 		stmt := p.parseStatement()
 		if stmt != nil {
 			program.Statements = append(program.Statements, stmt)
@@ -110,9 +143,12 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
-	stmt := &ast.ExpressionStatement{Token: p.curToken}
-	stmt.Expression = p.parseExpression(LOWEST)
-	return stmt
+    stmt := &ast.ExpressionStatement{Token: p.curToken}
+    stmt.Expression = p.parseExpression(LOWEST)
+    if p.peekTokenIs(token.SEMICOLON) {
+        p.nextToken()
+    }
+    return stmt
 }
 
 func (p *Parser) parseExpression(precedence int) ast.Expression {
@@ -150,10 +186,6 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	return lit
 }
 
-func (p *Parser) parseStringLiteral() ast.Expression {
-	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal} // упрощённая реализация
-}
-
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression := &ast.InfixExpression{
 		Token:    p.curToken,
@@ -177,76 +209,107 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 
 func (p *Parser) parseFunctionDefinition() ast.Statement {
 	fd := &ast.FunctionDefinition{Token: p.curToken}
-	if !p.expectPeek(token.Identifier) {
-		return nil
-	}
+
+	// имя функции
+	if !p.expectPeek(token.Identifier) { return nil }
 	fd.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	if !p.expectPeek(token.Sep_LParen) {
-		return nil
-	}
+
+	// список параметров: '(' ... ')'
+	if !p.expectPeek(token.Sep_LParen) { return nil }
 	fd.Parameters = p.parseFunctionParameters()
-	if !p.expectPeek(token.Sep_LParen) {
-		return nil
+
+	// --- короткая форма "→ expr" (неявный return) ---
+	// поддержим обе ситуации: ARROW в peek или уже в cur
+	if p.peekTokenIs(token.ARROW) {
+		p.nextToken() // cur = ARROW
 	}
+	if p.curTokenIs(token.ARROW) {
+		p.nextToken() // перейти к первому токену выражения
+		expr := p.parseExpression(LOWEST)
+
+		ret := &ast.ReturnStatement{
+			Token:       token.Token{Type: token.ARROW, Literal: "→"},
+			ReturnValue: expr,
+		}
+		fd.Body = &ast.BlockStatement{
+			Token:      token.Token{Type: token.Sep_LParen, Literal: "("},
+			Statements: []ast.Statement{ret},
+		}
+		return fd
+	}
+	// --- обычное тело "( ... )" ---
+	if !p.expectPeek(token.Sep_LParen) { return nil }
 	fd.Body = p.parseBlockStatement()
 	return fd
 }
 
-func isTypeToken(t token.TokenType) bool {
-	return t == token.Runa_Type_Int || t == token.Runa_Type_Float ||
-		t == token.Runa_Type_Str || t == token.Runa_Type_Char ||
-		t == token.Runa_Type_Collection
-}
-
 func (p *Parser) parseFunctionParameters() []*ast.Parameter {
-	params := []*ast.Parameter{}
+    params := []*ast.Parameter{}
 
-	if p.peekTokenIs(token.Sep_RParen) {
-		p.nextToken()
-		return params
-	}
+    if p.peekTokenIs(token.Sep_RParen) {
+        p.nextToken()
+        return params
+    }
 
-	for {
-		p.nextToken()
+    p.nextToken()
 
-		if !p.curTokenIs(token.Runa_Type_Int) {
-			p.errors = append(p.errors, fmt.Sprintf("ожидался тип параметра (например, □), но получен %s", p.curToken.Type))
-			return nil
-		}
-		param := &ast.Parameter{Token: p.curToken}
+    if p.curTokenIs(token.Sep_RParen) {
+        return params
+    }
 
-		if !p.expectPeek(token.Identifier) {
-			return nil
-		}
-		param.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-		params = append(params, param)
+    param := &ast.Parameter{Token: p.curToken}
+    if !isTypeToken(param.Token.Type) {
+        p.errors = append(p.errors, fmt.Sprintf("ожидался тип параметра, но получен %s", p.curToken.Type))
+        return nil
+    }
 
-		if !p.peekTokenIs(token.Sep_Comma) {
-			break
-		}
-		p.nextToken() // пропустить запятую
-	}
-	
-	if !p.expectPeek(token.Sep_RParen) {
-		return nil
-	}
+    if !p.expectPeek(token.Identifier) {
+        return nil
+    }
+    param.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+    params = append(params, param)
 
-	return params
+    for p.peekTokenIs(token.Sep_Comma) {
+        p.nextToken()
+        p.nextToken()
+        
+        param := &ast.Parameter{Token: p.curToken}
+        if !isTypeToken(param.Token.Type) {
+            p.errors = append(p.errors, fmt.Sprintf("ожидался тип параметра, но получен %s", p.curToken.Type))
+            return nil
+        }
+
+        if !p.expectPeek(token.Identifier) {
+            return nil
+        }
+        param.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+        params = append(params, param)
+    }
+
+    if !p.expectPeek(token.Sep_RParen) {
+        return nil
+    }
+
+    return params
 }
+
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
-	block := &ast.BlockStatement{Token: p.curToken}
-	block.Statements = []ast.Statement{}
-	p.nextToken()
+    block := &ast.BlockStatement{Token: p.curToken}
+    p.nextToken() 
 
-	for !p.curTokenIs(token.Sep_RParen) && !p.curTokenIs(token.EOF) {
-		stmt := p.parseStatement()
-		if stmt != nil {
-			block.Statements = append(block.Statements, stmt)
-		}
-		p.nextToken()
-	}
-	return block
+    for !p.curTokenIs(token.Sep_RParen) && !p.curTokenIs(token.EOF) {
+        if p.curTokenIs(token.SEMICOLON) { // '⁞'
+            p.nextToken()
+            continue
+        }
+        stmt := p.parseStatement()
+        if stmt != nil {
+            block.Statements = append(block.Statements, stmt)
+        }
+        p.nextToken()
+    }
+    return block
 }
 
 func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
@@ -276,7 +339,6 @@ func (p *Parser) parseExpressionList(end token.TokenType) []ast.Expression {
 
 func (p *Parser) curTokenIs(t token.TokenType) bool  { return p.curToken.Type == t }
 func (p *Parser) peekTokenIs(t token.TokenType) bool { return p.peekToken.Type == t }
-
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
@@ -301,7 +363,7 @@ func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
 }
 
 func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
-	p.infixParseFns[tokenType] = fn
+    p.infixParseFns[tokenType] = fn
 }
 
 func (p *Parser) peekPrecedence() int {
@@ -317,3 +379,21 @@ func (p *Parser) curPrecedence() int {
 	}
 	return LOWEST
 }
+
+func isTypeToken(t token.TokenType) bool {
+	return t == token.Runa_Type_Int
+}
+
+func (p *Parser) parseStringLiteral() ast.Expression {
+	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+// ... a new type added to ast.go for strings
+type StringLiteral struct {
+	Token token.Token
+	Value string
+}
+
+func (sl *StringLiteral) expressionNode() {}
+func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
+func (sl *StringLiteral) String() string { return sl.Token.Literal }

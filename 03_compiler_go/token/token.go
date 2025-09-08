@@ -11,6 +11,8 @@ type Token struct {
 const (
 	ILLEGAL = "ILLEGAL"
 	EOF     = "EOF"
+	ARROW     = "ARROW"    
+    SEMICOLON = "SEMICOLON"
 
 	// Идентификаторы и Литералы
 	Identifier = "Identifier"
