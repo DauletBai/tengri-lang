@@ -1,0 +1,4 @@
+// Hello in Tengri AOT
+fn main() {
+  print(42);
+}

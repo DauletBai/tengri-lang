@@ -2,7 +2,7 @@ task,target,N,time_s,output
 fib_iter,go,40,0.000000,"RESULT: 102334155
 TIME: 0.000000084
 TIME_NS: 84"
-fib_iter,tengri-ast,40,0.052621,"Ошибки парсера:
+fib_iter,tengri-ast,40,0.050746,"Ошибки парсера:
 	ошибка: ожидался токен ), но получен ILLEGAL
 	ошибка: ожидался токен (, но получен ILLEGAL
 	не найдена функция для разбора токена 'ILLEGAL'
@@ -13,13 +13,13 @@ fib_iter,tengri-ast,40,0.052621,"Ошибки парсера:
 fib_iter,python,40,0.000002,"RESULT: 102334155
 TIME: 0.000002"
 fib_iter,vm,40,0.000001,"RESULT: 102334155
-TIME: 0.000000619
-TIME_NS: 619"
-fib_iter,tengri-aot,40,0.003461,102334155
+TIME: 0.000000620
+TIME_NS: 620"
+fib_iter,tengri-aot,40,0.010170,102334155
 fib_iter,go,60,0.000000,"RESULT: 8745084
 TIME: 0.000000145
 TIME_NS: 145"
-fib_iter,tengri-ast,60,0.052503,"Ошибки парсера:
+fib_iter,tengri-ast,60,0.100781,"Ошибки парсера:
 	ошибка: ожидался токен ), но получен ILLEGAL
 	ошибка: ожидался токен (, но получен ILLEGAL
 	не найдена функция для разбора токена 'ILLEGAL'
@@ -30,13 +30,13 @@ fib_iter,tengri-ast,60,0.052503,"Ошибки парсера:
 fib_iter,python,60,0.000003,"RESULT: 8745084
 TIME: 0.000003"
 fib_iter,vm,60,0.000001,"RESULT: 8745084
-TIME: 0.000000923
-TIME_NS: 923"
-fib_iter,tengri-aot,60,0.002618,1548008755920
+TIME: 0.000000917
+TIME_NS: 917"
+fib_iter,tengri-aot,60,0.002720,1548008755920
 fib_iter,go,90,0.000000,"RESULT: 210345902
-TIME: 0.000000239
-TIME_NS: 239"
-fib_iter,tengri-ast,90,0.053229,"Ошибки парсера:
+TIME: 0.000000241
+TIME_NS: 241"
+fib_iter,tengri-ast,90,0.050858,"Ошибки парсера:
 	ошибка: ожидался токен ), но получен ILLEGAL
 	ошибка: ожидался токен (, но получен ILLEGAL
 	не найдена функция для разбора токена 'ILLEGAL'
@@ -47,6 +47,6 @@ fib_iter,tengri-ast,90,0.053229,"Ошибки парсера:
 fib_iter,python,90,0.000004,"RESULT: 210345902
 TIME: 0.000004"
 fib_iter,vm,90,0.000001,"RESULT: 210345902
-TIME: 0.000001371
-TIME_NS: 1371"
-fib_iter,tengri-aot,90,0.002340,2880067194370816120
+TIME: 0.000001367
+TIME_NS: 1367"
+fib_iter,tengri-aot,90,0.002413,2880067194370816120

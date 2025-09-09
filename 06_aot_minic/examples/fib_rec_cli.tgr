@@ -1,0 +1,23 @@
+// Usage: fib_rec_cli <N> <REPS>
+fn fib(n) {
+  if (n < 2) { return n; }
+  return fib(n - 1) + fib(n - 2);
+}
+
+fn main() {
+  let n = argi(1);
+  let reps = argi(2);
+  if (reps <= 0) { reps = 2000; }
+
+  let start = time_ns();
+  let i = 0;
+  let last = 0;
+  while (i < reps) {
+    last = fib(n);
+    i = i + 1;
+  }
+  let end = time_ns();
+
+  print(last);
+  print_time_ns(end - start);   // ← единый формат для benchfast
+}

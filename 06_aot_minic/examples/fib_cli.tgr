@@ -1,0 +1,27 @@
+// Usage: fib_cli <N> <REPS>
+fn main() {
+  let n = argi(1);
+  let reps = argi(2);
+  if (reps <= 0) { reps = 2000000; }
+
+  let start = time_ns();
+  let i = 0;
+  let last = 0;
+  while (i < reps) {
+    let a = 0;
+    let b = 1;
+    let k = 0;
+    while (k < n) {
+      let tmp = a + b;
+      a = b;
+      b = tmp;
+      k = k + 1;
+    }
+    last = a;
+    i = i + 1;
+  }
+  let end = time_ns();
+
+  print(last);
+  print_time_ns(end - start);   // ← единый формат для benchfast
+}

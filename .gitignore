@@ -1,3 +1,5 @@
+.c/
+
 # Python
 __pycache__/
 *.pyc
@@ -36,6 +38,7 @@ pip-delete-this-directory.txt
 _obj/
 _test/
 bin/
+.bin/
 pkg/
 
 # Go Module

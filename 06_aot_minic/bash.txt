@@ -1,0 +1,32 @@
+cd ~/go/src/tengri-lang
+
+# 1) rebuild AOT transpiler (just in case)
+make -C 06_aot_minic build
+
+# 2) rebuild AOT examples with timer
+.bin/tengri-aot 06_aot_minic/examples/fib_cli.tgr -o .bin/fib_cli.c
+clang -O2 -o .bin/fib_cli .bin/fib_cli.c 06_aot_minic/runtime/runtime.c
+
+.bin/tengri-aot 06_aot_minic/examples/fib_rec_cli.tgr -o .bin/fib_rec_cli.c
+clang -O2 -o .bin/fib_rec_cli .bin/fib_rec_cli.c 06_aot_minic/runtime/runtime.c
+
+# 3) (if needed) build Go/VM binaries
+go build -tags=iter -o .bin/fib_iter_go 04_benchmarks/fibonacci_iter.go
+go build -o .bin/vm 05_vm_mini/main.go
+
+# 4) run benches
+go run tool/benchfast/main.go
+
+
+GO111MODULE=on go build -o .bin/tengri-aot 06_aot_minic
+
+.bin/tengri-aot 06_aot_minic/examples/fib_cli.tgr -o .bin/fib_cli.c
+clang -O2 -o .bin/fib_cli .bin/fib_cli.c 06_aot_minic/runtime/runtime.c
+
+.bin/tengri-aot 06_aot_minic/examples/fib_rec_cli.tgr -o .bin/fib_rec_cli.c
+clang -O2 -o .bin/fib_rec_cli .bin/fib_rec_cli.c 06_aot_minic/runtime/runtime.c
+
+go build -tags=iter -o .bin/fib_iter_go 04_benchmarks/fibonacci_iter.go
+go build -o .bin/vm 05_vm_mini/main.go
+
+go run tool/benchfast/main.go
