@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Tengri Language — Mission & Philosophy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mission and philosophy of the Tengri programming language: a modern, high-performance language inspired by Kazakh agglutinative morphology.">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <style>
+    :root {
+      --bg: #48696e;
+      --fg: #e3ecee;
+      --muted: #c9e2e4;
+      --accent: #00ABC2;
+      --card: #719096;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #FFEC2D; text-decoration: underline; }
+    .wrap { max-width: 960px; margin: 40px auto; padding: 0 20px; }
+    header { margin-bottom: 28px; }
+    h1 { font-size: 2.2rem; margin: 0 0 8px; letter-spacing: 0.3px; }
+    h2 { color: #e6e6e6; font-size: 1.35rem; margin-top: 28px; border-left: 4px solid var(--accent); padding-left: 10px; }
+    p.lead { color: var(--muted); font-size: 1.05rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 16px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, .2);}
+    ul { margin: 10px 0 10px 22px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 0.9rem; }
+    .lang { font-size: 0.95rem; color: var(--muted); }
+    .pill { display:inline-block; padding: 2px 10px; border:1px solid var(--border); border-radius:999px; margin-right:6px; background:#00ABC2; color:#222222; font-size:0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="pill">Tengri Language</div>
+      <div class="pill">Open Source</div>
+      <h1 class="py-3">Mission & Philosophy</h1>
+      <p class="lead">
+        Tengri is a modern, high-performance programming language inspired by the agglutinative morphology of the Kazakh language.
+        Our mission is to turn linguistic clarity into computational clarity: a language that is expressive, safe, and
+        fast from <span class="mono">AST → VM → JIT → AOT</span> — built for research, systems, and AI-driven workloads.
+      </p>
+    </header>
+
+    <section class="card">
+      <h2>Why Tengri — and why agglutinative roots?</h2>
+      <p>
+        Many languages evolved around English-like syntax. We take a different route: agglutinative forms enable compact yet explicit
+        composition of meaning. Tengri explores how this linguistic structure can streamline parsing and lower intermediate
+        representations, improving compiler simplicity and opening new optimization opportunities.
+      </p>
+      <ul>
+        <li><strong>Clarity by construction:</strong> morphology-inspired scoping and namespacing reduce ambiguity.</li>
+        <li><strong>Low ceremony:</strong> first-class expressions, lightweight blocks, predictable evaluation.</li>
+        <li><strong>Performance path:</strong> a single semantics across <span class="mono">AST → VM → JIT → AOT</span> enables incremental speedups without rewriting code.</li>
+      </ul>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Design Principles</h2>
+        <ul>
+          <li><strong>Expressive minimalism:</strong> small core, powerful standard patterns.</li>
+          <li><strong>Determinism:</strong> what you write is what runs; visible costs.</li>
+          <li><strong>Safety first:</strong> explicit mutation, clear lifetimes, simple error semantics.</li>
+          <li><strong>International by default:</strong> Unicode-ready, inclusive tooling, i18n docs.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Performance Roadmap</h2>
+        <ol>
+          <li><strong>AST Interpreter:</strong> correctness, developer UX, REPL.</li>
+          <li><strong>Register VM:</strong> lean bytecode, peephole passes, constant folding.</li>
+          <li><strong>Tiered JIT:</strong> hot-path fusion, inlining, bounds elimination.</li>
+          <li><strong>AOT:</strong> SSA-based optimizer, profile-guided codegen, link-time specialization.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>What success looks like</h2>
+      <ul>
+        <li><strong>Productivity:</strong> read/write ergonomics rivaling Python/JS; tooling that feels instant.</li>
+        <li><strong>Performance:</strong> VM &gt; Python by multiples; JIT approaching Go/Rust on numeric kernels.</li>
+        <li><strong>Interoperability:</strong> seamless FFI with C/Go/Rust; easy embedding and sandboxing.</li>
+        <li><strong>Reliability:</strong> deterministic builds, reproducible benchmarks, verified semantics.</li>
+      </ul>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Open Community</h2>
+        <ul>
+          <li><strong>MIT License:</strong> permissive and business-friendly.</li>
+          <li><strong>Transparent benchmarks:</strong> CSV + plots checked into the repo; reproducible scripts.</li>
+          <li><strong>Contributor first:</strong> clear onboarding, good first issues, mentoring.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>Governance & Ethics</h2>
+        <ul>
+          <li><strong>Meritocratic + inclusive:</strong> technical proposals evaluated openly.</li>
+          <li><strong>Respect for language & culture:</strong> celebrating Kazakh roots while serving a global audience.</li>
+          <li><strong>Sustainability:</strong> funding-neutral roadmap; transparent sponsorship.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Short abstracts</h2>
+      <p class="lang"><strong>Русский:</strong> Tengri — экспериментальный высокопроизводительный язык, основанный на агглютинативных идеях
+        казахского языка. Цель — соединить выразительность с предсказуемой производительностью и прозрачной оптимизацией
+        (AST→VM→JIT→AOT), сохранив простоту, безопасность и открытость проекта.</p>
+      <p class="lang"><strong>Қазақша:</strong> Tengri — қазақ тілінің агглютинативті құрылымынан шабыттанған жоғары өнімді бағдарламалау тілі.
+        Мақсат — түсінікті синтаксис пен болжамды өнімділікті біріктіріп, AST→VM→JIT→AOT арқылы кезең-кезеңімен
+        жеделдетуді қамтамасыз ету.</p>
+    </section>
+
+    <footer>
+      <ul class="nav justify-content-center pb-3 mb-3"> 
+        <li class="nav-item"><a href="#" class="px-2">Open-source</a></li> 
+        <li class="nav-item"><a href="#" class="px-2">MIT licensed</a></li> 
+        <li class="nav-item"><a href="#" class="px-2">Benchmarks</a></li>
+      </ul>
+      <p class="text-center">&copy; <a href="#">Tengri Language Project.</a></p>
+    </footer>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+</body>
+</html>
