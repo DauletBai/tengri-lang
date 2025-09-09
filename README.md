@@ -1,47 +1,145 @@
-# Tengri-Lang: A High-Performance Programming Language Concept
+# Tengri Language (Tengri-lang)
 
-[![Status](https://img.shields.io/badge/status-in_development-orange.svg)](https://github.com/DauletBai/tengri-lang)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](/LICENSE)
+[![Status](https://img.shields.io/badge/status-in_development-orange)](#)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**Tengri-Lang** is an experimental programming language designed to test a fundamental hypothesis: can a language architecture derived from the principles of natural agglutinative languages (like Turkic languages) achieve a significant performance increase over traditional computing paradigms?
+A research-first, open-source programming language inspired by the **agglutinative morphology of Kazakh**. Our goal is to turn *linguistic clarity* into *computational clarity* and deliver **predictable performance** across a staged toolchain:
 
-This project explores a novel approach to compiler design, focusing on minimizing syntactic complexity and eliminating redundant layers of abstraction to boost execution speed.
+**AST → VM → JIT → AOT**
 
-## 核心理念 (The Core Idea)
+> **Preliminary evidence**: our prototype VM already shows multi‑× speedups over Python on numeric kernels and approaches Go on selected microbenchmarks. Reproducible CSV/plots live under `benchmarks/` (see below).
 
-The central thesis is that modern programming languages inherit syntactic and structural complexities that create performance overhead. Tengri-Lang is designed around three core principles to combat this:
+---
 
-1.  **Minimalist Agglutinative Syntax:** The grammar is linear and context-dependent, similar to agglutination in linguistics. This drastically simplifies the parsing stage (lexing and AST construction), making the compiler faster and more efficient.
-2.  **No Redundant Abstractions:** The language aims to provide a more direct mapping of concepts to execution, removing complex intermediate layers like cumbersome ORMs or verbose protocols. The proposed database and data transfer protocols are integrated at a semantic level.
-3.  **Static & Strong Typing from Archetypes:** The type system is built on a small set of universal "archetypes" (e.g., Number, Text, Collection), allowing for aggressive compile-time optimizations.
+## ✨ Design in a nutshell
+- **Expressive minimalism.** Small, orthogonal core; explicit effects; visible costs.
+- **Determinism & safety.** Predictable evaluation; explicit mutation; simple errors.
+- **Performance path.** One semantics mapped consistently from AST to VM to JIT to AOT.
+- **International by default.** Unicode‑ready tooling, English/Russian/Kazakh docs.
 
-The primary goal of this research is to achieve a **3x-5x performance improvement** in specific computing domains (like data processing, and high-throughput services) compared to mainstream languages.
+See also:
+- `01_philosophy/mission_i18n.html` (Mission & Philosophy, EN/RU/KZ)
+- `01_philosophy/governance_roadmap_i18n.html` (Governance & Roadmap, EN/RU/KZ)
 
-## 📂 Repository Structure
+---
 
-This repository documents the entire research and development process.
+## 📦 Repository layout
 
-* **/01_philosophy/**: Contains the original manuscript [**"Tartarus & I" (HTML, Russian)**](./01_philosophy/Tartarus_&_I.html) that outlines the linguistic and philosophical inspiration behind the project.
-* **/02_prototype_python/**: A reference implementation of an interpreter written in Python. Used for rapid prototyping of language features.
-* **/03_compiler_go/**: The main high-performance implementation of a Tengri-Lang tree-walking interpreter, written in Go. This is the version intended for benchmarking and future development into a full compiler.
-* **/04_benchmarks/**: (Coming Soon) A dedicated directory for performance tests and comparison results.
+```
+.
+├── 01_philosophy/              # Mission, Governance (EN/RU/KZ), book materials
+│   └── site/                   # Mini-site for GitHub Pages (index.html, mission, governance)
+├── 02_prototype_python/        # Reference prototype in Python
+├── 03_compiler_go/             # Go implementation (lexer, parser, AST evaluator)
+├── 04_benchmarks/              # Standalone benchmark programs (Go/Python/Tengri)
+├── 05_vm_mini/                 # Minimal register VM prototype
+├── tools/benchfast/            # Cross-runtime benchmark runner (tables, CSV, plots)
+├── benchmarks/                 # Results (versioned runs and "latest")
+│   ├── latest/
+│   │   ├── results/*.csv
+│   │   └── plots/*.png
+│   └── runs/YYYYmmdd-HHMMSS/...
+├── Makefile                    # Common shortcuts (bench, bench-fast, bench-plot, bench-commit)
+├── README.md                   # You are here
+├── CONTRIBUTING.md             # Contributing guide
+├── CODE_OF_CONDUCT.md          # CoC
+└── LICENSE                     # MIT
+```
 
-## 🚀 Getting Started
+---
 
-### 1. Python Prototype
+## 🚀 Quick start
 
-Requires Python 3.
+### Requirements
+- Go (1.21+ recommended)
+- Python 3.9+
+- Optional (for plots): `gonum.org/v1/plot`
+  ```bash
+  go get gonum.org/v1/plot@latest
+  go mod tidy
+  ```
 
+### Run sanity checks
 ```bash
-cd 02_prototype_python
-python3 main.py
+# Fibonacci (recursive/iterative) reference programs
+go run 04_benchmarks/fibonacci.go
+go run -tags=iter 04_benchmarks/fibonacci_iter.go 60
 
-### 2. Go Interpreter
+python3 04_benchmarks/fibonacci.py
+python3 04_benchmarks/fibonacci_iter.py 60
 
-Requires Go 1.24+
+# Minimal VM
+go run 05_vm_mini/main.go 60
+```
 
+### Cross-runtime benchmarks
 ```bash
-cd 03_compiler_go
-go run .
+# Tables + CSV
+make bench-fast
 
-The entry point main.go contains a sample program to execute.
+# Tables + CSV + plots (PNG)
+make bench-plot
+
+# Save plots & CSV to repo and commit
+make bench-commit
+```
+Outputs are stored under:
+- `benchmarks/latest/results/*.csv`
+- `benchmarks/latest/plots/*.png`
+- and versioned in `benchmarks/runs/<timestamp>/...`
+
+> The runner recognizes parse failures in the current Go interpreter and marks them as `ERR` (see `tools/benchfast/main.go`, `markStatus`).
+
+---
+
+## 🧠 Current status & known issues
+
+- **Parser (Go implementation):** messages like “не найдена функция для разбора токена ')'” indicate a missing Pratt entry. Check `03_compiler_go/parser.go`:
+  - Ensure `registerInfix(token.RPAREN, ...)` is **not** needed (right paren should usually terminate a sub‑expression).
+  - Verify that *all* infix operators used in programs (e.g. `PLUS`, `MINUS`, `ASTERISK`, `SLASH`, `LT`, `GT`, `EQ`, `NOT_EQ`, custom `ARROW`, `SEMICOLON` handling) are registered via `registerInfix(tok, p.parseInfixExpression)` and that `parseInfixExpression` is implemented.
+  - If you introduced a new token (e.g. `ARROW`), add it to `token/token.go`, teach the **lexer**, assign a **precedence**, and register a **prefix/infix parse function**.
+  - Make sure prefix calls (`registerPrefix`) cover identifiers, integers, strings, booleans, unary `!`/`-`, grouped `(`expr`)`, function literals, call expressions, and indexing.
+
+- **Bench runner:** keep the N-sets small by default to avoid long runs. You can override in `tools/benchfast/main.go`:
+  ```go
+  NsRec := []int{30, 32, 34}
+  NsIter := []int{40, 60, 90}
+  ```
+
+- **Reproducibility:** each run writes CSV/plots under `benchmarks/runs/<timestamp>/...` and updates `benchmarks/latest/...` for Git diffs.
+
+---
+
+## 📈 Interpreting early numbers (rule of thumb)
+
+- **VM vs Python:** expect ×3–×10 on numeric kernels (tight loops), depending on Python’s implementation and I/O.
+- **VM vs Go:** VM will trail native Go; closing the gap requires simple peephole passes and hot‑path fusion.
+- **JIT/AOT outlook:** reducing the gap to within ×2 of Go on kernel workloads is a realistic medium‑term target.
+
+> Microbenchmarks are **not** the whole story. We’ll add string/JSON, maps, recursion, and IO-bound suites to get a balanced view.
+
+---
+
+## 🤝 Contributing
+
+We welcome issues and PRs in English, Russian, or Kazakh. Please read:
+- `CONTRIBUTING.md`
+- `CODE_OF_CONDUCT.md`
+
+Good first issues:
+- Parser: fill Pratt tables and precedence; fix error messages.
+- VM: add opcodes, constant folding, peephole rules.
+- Bench: add tasks (maps/reduce, string ops, JSON parse, matrix mul).
+
+---
+
+## 📚 Papers & community
+
+We plan to publish English-language writeups and submit to PL venues (ICFP/PLDI/POPL) as the prototype matures. Follow the mini‑site:
+- `01_philosophy/site/index.html` (or GitHub Pages if enabled)
+
+---
+
+## 📝 License
+
+MIT © Tengri Language contributors
