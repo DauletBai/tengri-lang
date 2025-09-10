@@ -1,41 +1,16 @@
-package main
+package aotminic
 
 import (
 	"bufio"
 	"bytes"
-	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 )
 
-func usage() {
-	fmt.Fprintf(os.Stderr, "Usage: %s <input.tgr> -o <out.c>\n", os.Args[0])
-	os.Exit(2)
-}
-
-func main() {
-	if len(os.Args) < 4 { usage() }
-	inPath := os.Args[1]
-	if os.Args[2] != "-o" { usage() }
-	outPath := os.Args[3]
-
-	srcBytes, err := os.ReadFile(inPath)
-	if err != nil { fatal(err) }
-
-	c, err := transpileToC(string(srcBytes), filepath.Base(inPath))
-	if err != nil { fatal(err) }
-	if err := os.WriteFile(outPath, []byte(c), 0644); err != nil { fatal(err) }
-	fmt.Println("C emitted:", outPath)
-}
-
-func fatal(err error) { fmt.Fprintln(os.Stderr, "error:", err); os.Exit(1) }
-
-func transpileToC(src string, name string) (string, error) {
+func TranspileToC(src string, name string) (string, error) {
 	var b bytes.Buffer
 
-	// ---- C PROLOGUE ----
+	// C prologue: standard headers + runtime prototypes
 	b.WriteString("#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n\n")
 	b.WriteString("extern int __argc; extern char** __argv;\n")
 	b.WriteString("long print(long x);\n")
@@ -105,7 +80,6 @@ func transpileToC(src string, name string) (string, error) {
 			b.WriteString(trim + "\n")
 		}
 	}
-	if err := sc.Err(); err != nil { return "", err }
 	return b.String(), nil
 }
 
@@ -115,26 +89,38 @@ func splitSignature(sig string) (name string, params string, tail string) {
 	close := strings.LastIndex(sig, ")")
 	if open == -1 || close == -1 || close < open {
 		parts := strings.SplitN(sig, " ", 2)
-		if len(parts) == 2 { return parts[0], "", parts[1] }
+		if len(parts) == 2 {
+			return parts[0], "", parts[1]
+		}
 		return sig, "", "{"
 	}
 	name = strings.TrimSpace(sig[:open])
 	params = strings.TrimSpace(sig[open+1 : close])
 
 	rest := strings.TrimSpace(sig[close+1:])
-	if rest == "" { rest = "{" }
+	if rest == "" {
+		rest = "{"
+	}
 	return name, params, rest
 }
 
 func typeParamsAsLong(params string) string {
 	params = strings.TrimSpace(params)
-	if params == "" { return "" }
+	if params == "" {
+		return ""
+	}
 	parts := strings.Split(params, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
-		if p == "" { continue }
-		if strings.Contains(p, " ") { out = append(out, p) } else { out = append(out, "long "+p) }
+		if p == "" {
+			continue
+		}
+		if strings.Contains(p, " ") {
+			out = append(out, p)
+		} else {
+			out = append(out, "long "+p)
+		}
 	}
 	return strings.Join(out, ", ")
 }

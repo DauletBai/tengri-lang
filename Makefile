@@ -1,20 +1,24 @@
 SHELL := /bin/bash
-GO := GO111MODULE=on go
+GO    := GO111MODULE=on go
 
-# Бинарники/пути
 BIN_DIR := .bin
-AOT_BIN := $(BIN_DIR)/tengri-aot
-VM_BIN  := $(BIN_DIR)/vm
+
+# Binaries
+AOT_CLI := $(BIN_DIR)/tengri-aot
+VM_CLI  := $(BIN_DIR)/tengri-vm
 GO_ITER := $(BIN_DIR)/fib_iter_go
 
-# Файлы AOT-примеров
-AOT_FIB_ITER_TGR := 06_aot_minic/examples/fib_cli.tgr
-AOT_FIB_REC_TGR  := 06_aot_minic/examples/fib_rec_cli.tgr
+# Bench tool
+BENCHFAST := ./cmd/benchfast
 
-# Инструменты
-BENCHFAST := tool/benchfast/main.go
+# Runtime
+RUNTIME_C := internal/aotminic/runtime/runtime.c
 
-.PHONY: all setup build clean bench-fast bench-plot aot aot-examples go-vm
+# Bench sources (AOT examples already moved under benchmarks/src)
+TGR_FIB_ITER := benchmarks/src/fib_iter/tengri/fib_cli.tgr
+TGR_FIB_REC  := benchmarks/src/fib_rec/tengri/fib_rec_cli.tgr
+
+.PHONY: all setup build clean bench-fast bench-plot aot aot-examples vm go-iter
 
 all: build
 
@@ -22,28 +26,31 @@ setup:
 	@$(GO) mod tidy
 	@$(GO) get gonum.org/v1/plot@latest
 
-build: aot go-vm
+build: aot vm go-iter
 
 aot:
 	@mkdir -p $(BIN_DIR)
-	@$(GO) build -o $(AOT_BIN) 06_aot_minic
+	@$(GO) build -o $(AOT_CLI) ./cmd/tengri-aot
 
 aot-examples: aot
-	@$(AOT_BIN) $(AOT_FIB_ITER_TGR) -o $(BIN_DIR)/fib_cli.c
-	@clang -O2 -o $(BIN_DIR)/fib_cli $(BIN_DIR)/fib_cli.c 06_aot_minic/runtime/runtime.c
-	@$(AOT_BIN) $(AOT_FIB_REC_TGR) -o $(BIN_DIR)/fib_rec_cli.c
-	@clang -O2 -o $(BIN_DIR)/fib_rec_cli $(BIN_DIR)/fib_rec_cli.c 06_aot_minic/runtime/runtime.c
+	@$(AOT_CLI) $(TGR_FIB_ITER) -o $(BIN_DIR)/fib_cli.c
+	@clang -O2 -o $(BIN_DIR)/fib_cli $(BIN_DIR)/fib_cli.c $(RUNTIME_C)
+	@$(AOT_CLI) $(TGR_FIB_REC) -o $(BIN_DIR)/fib_rec_cli.c
+	@clang -O2 -o $(BIN_DIR)/fib_rec_cli $(BIN_DIR)/fib_rec_cli.c $(RUNTIME_C)
 
-go-vm:
+vm:
 	@mkdir -p $(BIN_DIR)
-	@go build -tags=iter -o $(GO_ITER) 04_benchmarks/fibonacci_iter.go || true
-	@go build -o $(VM_BIN) 05_vm_mini/main.go || true
+	@$(GO) build -o $(VM_CLI) ./cmd/tengri-vm || true
+
+go-iter:
+	@mkdir -p $(BIN_DIR)
+	@$(GO) build -tags=iter -o $(GO_ITER) ./benchmarks/src/fib_iter/go/fibonacci_iter.go || true
 
 bench-fast: build aot-examples
-	@go run $(BENCHFAST)
+	@$(GO) run ./cmd/benchfast
 
 bench-plot: build aot-examples
-	@go run $(BENCHFAST) -plot
+	@$(GO) run ./cmd/benchfast -plot
 
 clean:
 	@rm -rf $(BIN_DIR)

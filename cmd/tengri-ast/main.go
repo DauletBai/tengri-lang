@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 	"io/ioutil"
-	"tengri-lang/03_compiler_go/evaluator"
-	"tengri-lang/03_compiler_go/lexer"
-	"tengri-lang/03_compiler_go/object"
-	"tengri-lang/03_compiler_go/parser"
+	"github.com/DauletBai/tengri-lang/03_compiler_go/evaluator"
+	"github.com/DauletBai/tengri-lang/03_compiler_go/lexer"
+	"github.com/DauletBai/tengri-lang/03_compiler_go/object"
+	"github.com/DauletBai/tengri-lang/03_compiler_go/parser"
 )
 
 func loadScriptFromEnv() (string, bool) {
