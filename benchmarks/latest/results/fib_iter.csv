@@ -1,31 +1,16 @@
-task,target,N,time_s,output
-fib_iter,go,40,0.000000,"RESULT: 102334155
-TIME: 0.000000146
-TIME_NS: 146"
-fib_iter,tengri-ast,40,0.016705,no Go files in /Users/dake/go/src/tengri-lang/03_compiler_go
-fib_iter,python,40,0.000000,SKIP: 04_benchmarks/fibonacci_iter.py missing
-fib_iter,vm,40,0.000001,"RESULT: 102334155
-TIME: 0.000001072
-TIME_NS: 1072"
-fib_iter,tengri-aot,40,0.048390,"102334155
-TIME_NS: 48390250"
-fib_iter,go,60,0.000000,"RESULT: 8745084
-TIME: 0.000000263
-TIME_NS: 263"
-fib_iter,tengri-ast,60,0.019460,no Go files in /Users/dake/go/src/tengri-lang/03_compiler_go
-fib_iter,python,60,0.000000,SKIP: 04_benchmarks/fibonacci_iter.py missing
-fib_iter,vm,60,0.000002,"RESULT: 8745084
-TIME: 0.000001591
-TIME_NS: 1591"
-fib_iter,tengri-aot,60,0.064453,"1548008755920
-TIME_NS: 64452834"
-fib_iter,go,90,0.000000,"RESULT: 210345902
-TIME: 0.000000425
-TIME_NS: 425"
-fib_iter,tengri-ast,90,0.016315,no Go files in /Users/dake/go/src/tengri-lang/03_compiler_go
-fib_iter,python,90,0.000000,SKIP: 04_benchmarks/fibonacci_iter.py missing
-fib_iter,vm,90,0.000002,"RESULT: 210345902
-TIME: 0.000002373
-TIME_NS: 2373"
-fib_iter,tengri-aot,90,0.095588,"2880067194370816120
-TIME_NS: 95588458"
+task,target,seconds,status
+fib_iter,go,0.000000146,OK
+fib_iter,tengri-ast,0.000000000,SKIP
+fib_iter,python,0.000003000,OK
+fib_iter,vm,0.000001071,OK
+fib_iter,tengri-aot,0.048115208,OK
+fib_iter,go,0.000000256,OK
+fib_iter,tengri-ast,0.000000000,SKIP
+fib_iter,python,0.000004000,OK
+fib_iter,vm,0.000001588,OK
+fib_iter,tengri-aot,0.064694292,OK
+fib_iter,go,0.000000424,OK
+fib_iter,tengri-ast,0.000000000,SKIP
+fib_iter,python,0.000007000,OK
+fib_iter,vm,0.000002372,OK
+fib_iter,tengri-aot,0.095127667,OK

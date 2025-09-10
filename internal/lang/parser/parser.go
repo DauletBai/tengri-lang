@@ -4,9 +4,9 @@ package parser
 import (
 	"fmt"
 	"strconv"
-	"tengri-lang/03_compiler_go/ast"
-	"tengri-lang/03_compiler_go/lexer"
-	"tengri-lang/03_compiler_go/token"
+	"github.com/DauletBai/tengri-lang/internal/lang/ast"
+	"github.com/DauletBai/tengri-lang/internal/lang/lexer"
+	"github.com/DauletBai/tengri-lang/internal/lang/token"
 )
 
 const (

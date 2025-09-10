@@ -2,7 +2,7 @@
 package lexer
 
 import (
-	"tengri-lang/03_compiler_go/token"
+	"github.com/DauletBai/tengri-lang/internal/lang/token"
 	"unicode"
 )
 type Lexer struct {

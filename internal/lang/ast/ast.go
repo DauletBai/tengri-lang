@@ -3,7 +3,7 @@ package ast
 
 import (
 	"bytes"
-	"tengri-lang/03_compiler_go/token"
+	"github.com/DauletBai/tengri-lang/internal/lang/token"
 	"strings"
 )
 

@@ -3,8 +3,8 @@ package evaluator
 
 import (
 	"fmt"
-	"tengri-lang/03_compiler_go/ast"
-	"tengri-lang/03_compiler_go/object"
+	"github.com/DauletBai/tengri-lang/internal/lang/ast"
+	"github.com/DauletBai/tengri-lang/internal/lang/object"
 )
 
 func Eval(node ast.Node, env *object.Environment) object.Object {

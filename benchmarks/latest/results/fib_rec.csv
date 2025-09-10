@@ -1,19 +1,16 @@
-task,target,N,time_s,output
-fib_rec,go,30,0.000000,SKIP: 04_benchmarks/fibonacci.go missing
-fib_rec,tengri-ast,30,0.023155,no Go files in /Users/dake/go/src/tengri-lang/03_compiler_go
-fib_rec,python,30,0.000000,SKIP: 04_benchmarks/fibonacci.py missing
-fib_rec,vm,30,0.000000,SKIP: vm supports fib_iter only
-fib_rec,tengri-aot,30,0.005301,"832040
-TIME_NS: 5300875"
-fib_rec,go,32,0.000000,SKIP: 04_benchmarks/fibonacci.go missing
-fib_rec,tengri-ast,32,0.021867,no Go files in /Users/dake/go/src/tengri-lang/03_compiler_go
-fib_rec,python,32,0.000000,SKIP: 04_benchmarks/fibonacci.py missing
-fib_rec,vm,32,0.000000,SKIP: vm supports fib_iter only
-fib_rec,tengri-aot,32,0.010514,"2178309
-TIME_NS: 10514291"
-fib_rec,go,34,0.000000,SKIP: 04_benchmarks/fibonacci.go missing
-fib_rec,tengri-ast,34,0.015128,no Go files in /Users/dake/go/src/tengri-lang/03_compiler_go
-fib_rec,python,34,0.000000,SKIP: 04_benchmarks/fibonacci.py missing
-fib_rec,vm,34,0.000000,SKIP: vm supports fib_iter only
-fib_rec,tengri-aot,34,0.027945,"5702887
-TIME_NS: 27944834"
+task,target,seconds,status
+fib_rec,go,0.292560750,OK
+fib_rec,tengri-ast,0.000000000,SKIP
+fib_rec,python,1.343291042,OK
+fib_rec,vm,0.000000000,SKIP
+fib_rec,tengri-aot,0.005361167,OK
+fib_rec,go,0.061438750,OK
+fib_rec,tengri-ast,0.000000000,SKIP
+fib_rec,python,1.310824791,OK
+fib_rec,vm,0.000000000,SKIP
+fib_rec,tengri-aot,0.010631625,OK
+fib_rec,go,0.053613792,OK
+fib_rec,tengri-ast,0.000000000,SKIP
+fib_rec,python,1.316476708,OK
+fib_rec,vm,0.000000000,SKIP
+fib_rec,tengri-aot,0.027636875,OK

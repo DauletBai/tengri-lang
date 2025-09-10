@@ -1,54 +1,61 @@
-// 03_compiler_go/main.go
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
-	"io/ioutil"
-	"github.com/DauletBai/tengri-lang/03_compiler_go/evaluator"
-	"github.com/DauletBai/tengri-lang/03_compiler_go/lexer"
-	"github.com/DauletBai/tengri-lang/03_compiler_go/object"
-	"github.com/DauletBai/tengri-lang/03_compiler_go/parser"
+
+	"github.com/DauletBai/tengri-lang/internal/lang/evaluator"
+	"github.com/DauletBai/tengri-lang/internal/lang/lexer"
+	"github.com/DauletBai/tengri-lang/internal/lang/object"
+	"github.com/DauletBai/tengri-lang/internal/lang/parser"
 )
 
-func loadScriptFromEnv() (string, bool) {
-    path := os.Getenv("TENGRI_SCRIPT")
-    if path == "" {
-        return "", false
-    }
-    b, err := os.ReadFile(path)
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "cannot read %s: %v\n", path, err)
-        return "", false
-    }
-    return string(b), true
-}
-
 func main() {
-	// Читаем код из файла для бенчмарка
-	inputBytes, err := ioutil.ReadFile("../04_benchmarks/fibonacci.tengri")
-	if err != nil {
-		fmt.Printf("Ошибка чтения файла: %s\n", err)
-		return
-	}
-	input := string(inputBytes)
+	env := object.NewEnvironment()
 
-	l := lexer.New(input)
-	p := parser.New(l)
-	program := p.ParseProgram()
-
-	if len(p.Errors()) != 0 {
-		fmt.Println("Ошибки парсера:")
-		for _, msg := range p.Errors() {
-			fmt.Println("\t" + msg)
+	if len(os.Args) > 1 {
+		if err := runFile(os.Args[1], env); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
 		}
 		return
 	}
 
-	env := object.NewEnvironment()
-	result := evaluator.Eval(program, env)
+	repl(os.Stdin, os.Stdout, env)
+}
 
-	if result != nil {
-		fmt.Println(result.Inspect()) // Выводим результат вычислений
+func runFile(path string, env *object.Environment) error {
+	src, err := os.ReadFile(path)
+	if err != nil { return err }
+	l := lexer.New(string(src))
+	p := parser.New(l)
+	prog := p.ParseProgram()
+	if errs := p.Errors(); len(errs) > 0 {
+		for _, e := range errs { fmt.Fprintln(os.Stderr, "parser error:", e) }
+		return fmt.Errorf("parse failed")
+	}
+	val := evaluator.Eval(prog, env)
+	if val != nil { fmt.Println(val.Inspect()) }
+	return nil
+}
+
+func repl(in io.Reader, out io.Writer, env *object.Environment) {
+	sc := bufio.NewScanner(in)
+	fmt.Fprintln(out, "Tengri REPL (AST) — Ctrl+D to exit")
+	for {
+		fmt.Fprint(out, ">> ")
+		if !sc.Scan() { break }
+		line := sc.Text()
+		l := lexer.New(line)
+		p := parser.New(l)
+		prog := p.ParseProgram()
+		if errs := p.Errors(); len(errs) > 0 {
+			for _, e := range errs { fmt.Fprintln(out, "parser error:", e) }
+			continue
+		}
+		val := evaluator.Eval(prog, env)
+		if val != nil { fmt.Fprintln(out, val.Inspect()) }
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"tengri-lang/03_compiler_go/ast"
+	"github.com/DauletBai/tengri-lang/internal/lang/ast"
 )
 
 type ObjectType string
