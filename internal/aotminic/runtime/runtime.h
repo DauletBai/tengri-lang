@@ -1,18 +1,27 @@
-#ifndef TENGRI_RUNTIME_H
-#define TENGRI_RUNTIME_H
+#ifndef TENGRI_MINI_RUNTIME_H
+#define TENGRI_MINI_RUNTIME_H
 
-// Глобальные argv/argc для argi()
-extern int __argc;
-extern char **__argv;
+#include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
 
-// Примитивы рантайма
-long print(long x);
-long argi(long idx);
+static inline long time_ns(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long)ts.tv_sec * 1000000000L + (long)ts.tv_nsec;
+}
 
-// Высокоточный монотонный таймер (ns)
-long time_ns(void);
+static inline void print_time_ns(long ns) {
+    printf("TIME_NS: %ld\n", ns);
+}
 
-// Удобная печать метрики для бенча: "TIME_NS: <ns>"
-long print_time_ns(long ns);
+static inline void print(long v) {
+    printf("%ld\n", v);
+}
 
-#endif // TENGRI_RUNTIME_H
+static inline long argi(int argc, char** argv, int idx, long defv) {
+    if (argc > idx) return strtoll(argv[idx], NULL, 10);
+    return defv;
+}
+
+#endif
