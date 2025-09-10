@@ -1,51 +1,19 @@
-.c/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.eggs/
-*.egg-info/
-*.egg
-
-# Go
-# Compiled Object files, builds, and executables
+# build artefacts
+.bin/
+bin/
+dist/
 *.o
 *.a
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+*.out
 
-# Don't Ignore Bench Artifacts
-!benchmarks/
-!benchmarks/runs/
-!benchmarks/runs/**/*
-!benchmarks/latest/
-!benchmarks/latest/**/*
-
-# Test binary, built with `go test -c`
-*.test
-
-# Folders
-_obj/
-_test/
-bin/
-.bin/
-pkg/
-
-# Go Module
-go.sum
-
-# IDEs and OS-specific
-.vscode/
-.idea/
-*.swp
+# macOS junk
 .DS_Store
+*/.DS_Store
+__MACOSX/
+
+# benchmarks: храним только last CSV, графики регенерируем
+benchmarks/runs/
+benchmarks/latest/plots/
+
+# Go
+vendor/

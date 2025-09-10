@@ -35,16 +35,14 @@ func fatal(err error) { fmt.Fprintln(os.Stderr, "error:", err); os.Exit(1) }
 func transpileToC(src string, name string) (string, error) {
 	var b bytes.Buffer
 
-	// --- C prologue: стандартные инклуды + ПРОТОТИПЫ рантайма ---
+	// ---- C PROLOGUE ----
 	b.WriteString("#include <stdio.h>\n#include <stdint.h>\n#include <stdlib.h>\n\n")
-	// Глобальные argv/argc и прототипы функций рантайма
 	b.WriteString("extern int __argc; extern char** __argv;\n")
 	b.WriteString("long print(long x);\n")
 	b.WriteString("long argi(long idx);\n")
 	b.WriteString("long time_ns(void);\n")
 	b.WriteString("long print_time_ns(long ns);\n\n")
 
-	// --- НИЖЕ: та же логика преобразования, как у вас ранее ---
 	sc := bufio.NewScanner(strings.NewReader(src))
 	spaceRE := regexp.MustCompile(`[ \t]+`)
 	trueRE := regexp.MustCompile(`\btrue\b`)

@@ -9,7 +9,7 @@ import (
 
 const MOD = 1000000007
 
-// Опкоды
+// Opcodes
 const (
 	OpLoadImm byte = iota // reg[a] = imm8 (демо; для N>127 нужно будет добавить Imm16)
 	OpAddMod              // reg[a] = (reg[b] + reg[c]) % MOD

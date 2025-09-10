@@ -4,39 +4,22 @@ This commit introduces the first working AOT (ahead-of-time) path
 and integrates it into the unified benchmarking toolchain.
 
 Changes:
-- Added `06_aot_minic` directory with:
-  - minimal transpiler (Go → C emitter) `main.go`
-  - portable runtime (`runtime.c`, `runtime.h`)
-  - examples: `fib_cli.tgr`, `fib_rec_cli.tgr`
-- BenchFAST (`tool/benchfast/main.go`):
-  - now supports `tengri-aot` target
-  - parses `TIME_NS:` if present in stdout (priority over wall-time)
-  - saves results as CSV (`benchmarks/runs/.../results/*.csv`)
-  - optional `--plot` to produce PNG charts in `benchmarks/.../plots/`
-- Benchmarks:
-  - iterative and recursive Fibonacci tasks wired up
-  - CSV + plots stored in both timestamped runs and `latest/`
-  - graphs confirm expected trends (Go fastest, VM/AOT competitive,
-    Python slowest, AST interpreter still failing parse)
-- Build system:
-  - Makefile targets for AOT (`aot-build`, `aot-fib`, etc.)
-  - `.bin/` outputs ignored via `.gitignore`
+- Added minimal AOT transpiler and fixed C prologue with explicit
+  prototypes for time_ns/print_time_ns (to emit TIME_NS in stdout)
+- Deduplicated Makefile targets (bench-fast / bench-plot)
+- Kept current repo layout intact to avoid breaking builds
+- Ensured CSV/plots are generated consistently
 
 Known limitations / TODO:
-- AST parser still throws "не найдена функция для разбора токена ')'"
-- AOT currently shows wall-time if `time_ns/print_time_ns` prototypes
-  are not included; needs proper header integration
-- BenchFAST does not yet do warm-up/median runs (only single-shot)
-- Only Fibonacci tasks included; need 3–5 more real-world microbenches
-  (sum_loop, map_count, str_concat, tiny matmul, etc.)
+- AST parser still fails on ')' (Pratt table to fix)
+- BenchFAST uses single-shot; add warm-up and median/p90
+- Expand microbench suite beyond Fibonacci
 
 Next steps:
-1. Fix Pratt parser table for proper AST runs
-2. Ensure `time_ns` prototypes visible in AOT-generated `.c`
-3. Add warm-up + median/p90 calculation in BenchFAST
-4. Expand benchmark suite to 6–8 tasks
-5. Document performance methodology in `README.performance.md`
+1. Fix Pratt parser table
+2. Add warm-up + median/p90 in BenchFAST
+3. Add 3–5 new tasks (sum_loop, map_count, string_concat, tiny_matmul)
+4. Document methodology in README.performance.md
 
-This commit is a milestone: we now have a working end-to-end pipeline
-(AST → VM → AOT), first performance CSVs, and plots suitable for public
-repository publishing (GitHub-ready).
+This is a stability-focused refactor to make the pipeline consistent
+and ready for public repo consumption.
