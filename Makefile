@@ -1,125 +1,132 @@
-# ─────────────────────────────────────────────────────────────
-# Tengri-Lang — unified build & benchmark Makefile
-# ─────────────────────────────────────────────────────────────
+# Makefile (root)
 
-SHELL := /bin/sh
-
-# Directories
+# ----------------------------
+# Paths
+# ----------------------------
 BIN_DIR        := .bin
 RUNTIME_DIR    := internal/aotminic/runtime
-BENCH_DIR      := benchmarks
-BENCH_SRC_DIR  := $(BENCH_DIR)/src
-BENCH_RUNS_DIR := $(BENCH_DIR)/runs
-BENCH_LATEST   := $(BENCH_DIR)/latest
 
+# Tools (allow override via env)
+GO             ?= go
+CC             ?= clang
+
+# OS-specific flags (macOS/Linux)
+UNAME_S        := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	OS_DEFS   := -D_DARWIN_C_SOURCE
+else
+	OS_DEFS   := -D_POSIX_C_SOURCE=200809L
+endif
+
+CSTD           := -std=c11
+CFLAGS         := -O2 $(CSTD) $(OS_DEFS) -I$(RUNTIME_DIR)
+LDFLAGS        :=
+
+# ----------------------------
 # Binaries
+# ----------------------------
 BIN_AOT        := $(BIN_DIR)/tengri-aot
 BIN_VM         := $(BIN_DIR)/vm
-BIN_FIB_REC_GO := $(BIN_DIR)/fib_rec_go
-BIN_FIB_ITER_GO:= $(BIN_DIR)/fib_iter_go
+BIN_GO_REC     := $(BIN_DIR)/fib_rec_go
+BIN_GO_ITER    := $(BIN_DIR)/fib_iter_go
 
-# AOT outputs (C/ELF)
-BIN_AOT_ITER_C := $(BIN_DIR)/fib_cli.c
 BIN_AOT_ITER   := $(BIN_DIR)/fib_cli
-BIN_AOT_REC_C  := $(BIN_DIR)/fib_rec_cli.c
 BIN_AOT_REC    := $(BIN_DIR)/fib_rec_cli
 
+# ----------------------------
 # Sources
-FIB_REC_GO     := $(BENCH_SRC_DIR)/fib_rec/fibonacci.go
-FIB_REC_PY     := $(BENCH_SRC_DIR)/fib_rec/fibonacci.py
-FIB_REC_TGR    := $(BENCH_SRC_DIR)/fib_rec/tengri/fib_rec_cli.tgr
+# ----------------------------
+AOT_CMD_PKG    := ./cmd/tengri-aot
+VM_CMD_PKG     := ./cmd/tengri-vm
+GO_ITER_SRC    := benchmarks/src/fib_iter/go/fibonacci_iter.go
+GO_REC_SRC     := benchmarks/src/fib_rec/fibonacci.go
 
-FIB_ITER_GO    := $(BENCH_SRC_DIR)/fib_iter/go/fibonacci_iter.go
-FIB_ITER_PY    := $(BENCH_SRC_DIR)/fib_iter/python/fibonacci_iter.py
-FIB_ITER_TGR   := $(BENCH_SRC_DIR)/fib_iter/tengri/fib_iter_cli.tgr
+# Tengri programs (transpiler inputs)
+FIB_ITER_TGR   := benchmarks/src/fib_iter/tengri/fib_iter_cli.tgr
+FIB_REC_TGR    := benchmarks/src/fib_rec/tengri/fib_rec_cli.tgr
 
-# Compiler tools
-GO     ?= go
-PY     ?= python3
-CC     ?= clang
+# ----------------------------
+# Phony
+# ----------------------------
+.PHONY: all help build aot-examples bench bench-rebuild clean
 
-# Default target
-.PHONY: all
-all: build
+# ----------------------------
+# Default/help
+# ----------------------------
+all: help
 
-# ─────────────────────────────────────────────────────────────
+help:
+	@echo "Targets:"
+	@echo "  build           - build .bin/tengri-aot, .bin/vm, Go bench binaries"
+	@echo "  aot-examples    - transpile+link AOT examples: $(BIN_AOT_ITER), $(BIN_AOT_REC)"
+	@echo "  bench           - run benchmarks (requires AOT examples built)"
+	@echo "  bench-rebuild   - full rebuild of binaries + AOT examples, then run benchmarks"
+	@echo "  clean           - remove build artifacts in $(BIN_DIR)"
+	@echo ""
+	@echo "Env:"
+	@echo "  BENCH_REPS      - repetitions inside AOT runners (default: iter=5e6, rec=1)"
+	@echo ""
+	@echo "Notes:"
+	@echo "  TIMING: prefer TIME_NS over wall-clock; fallback to TIME:, then wall-clock"
+
+# ----------------------------
 # Build binaries
-# ─────────────────────────────────────────────────────────────
-
+# ----------------------------
 $(BIN_DIR):
 	@mkdir -p $(BIN_DIR)
 
 $(BIN_AOT): | $(BIN_DIR)
-	@echo "[build] aot -> $(BIN_AOT)"
-	@$(GO) build -o $(BIN_AOT) ./cmd/tengri-aot
+	@echo "[build] aot -> $@"
+	@$(GO) build -o $@ $(AOT_CMD_PKG)
 
 $(BIN_VM): | $(BIN_DIR)
-	@echo "[build] vm -> $(BIN_VM)"
-	@$(GO) build -o $(BIN_VM) ./cmd/tengri-vm
+	@echo "[build] vm -> $@"
+	@$(GO) build -o $@ $(VM_CMD_PKG)
 
-$(BIN_FIB_REC_GO): | $(BIN_DIR)
-	@echo "[build] go fib_rec -> $(BIN_FIB_REC_GO)"
-	@$(GO) build -o $(BIN_FIB_REC_GO) $(FIB_REC_GO)
+$(BIN_GO_ITER): $(GO_ITER_SRC) | $(BIN_DIR)
+	@echo "[build] go fib_iter -> $@"
+	@$(GO) build -o $@ $(GO_ITER_SRC)
 
-$(BIN_FIB_ITER_GO): | $(BIN_DIR)
-	@echo "[build] go fib_iter -> $(BIN_FIB_ITER_GO)"
-	@$(GO) build -tags=iter -o $(BIN_FIB_ITER_GO) $(FIB_ITER_GO)
+$(BIN_GO_REC): $(GO_REC_SRC) | $(BIN_DIR)
+	@echo "[build] go fib_rec -> $@"
+	@$(GO) build -o $@ $(GO_REC_SRC)
 
-.PHONY: build
-build: $(BIN_AOT) $(BIN_VM) $(BIN_FIB_REC_GO) $(BIN_FIB_ITER_GO)
+build: $(BIN_AOT) $(BIN_VM) $(BIN_GO_ITER) $(BIN_GO_REC)
 	@echo "[build] done."
 
-# ─────────────────────────────────────────────────────────────
-# AOT examples (transpile to C, then link with runtime)
-# ─────────────────────────────────────────────────────────────
-
-# NOTE: flag order matters for Go's flag package. Put flags before the source.
-# Was:  $(BIN_AOT) $(FIB_ITER_TGR) -o $(BIN_DIR)/fib_cli.c  (WRONG)
-# Now:  $(BIN_AOT) -o $(BIN_DIR)/fib_cli.c $(FIB_ITER_TGR) (CORRECT)
+# ----------------------------
+# AOT examples (transpile + link)
+# ----------------------------
+# Iterative
 $(BIN_AOT_ITER): $(BIN_AOT) $(RUNTIME_DIR)/runtime.c $(RUNTIME_DIR)/runtime.h $(FIB_ITER_TGR) | $(BIN_DIR)
-	@echo "[aot] transpile+link iterative -> $(BIN_AOT_ITER)"
-	@$(BIN_AOT) -o $(BIN_AOT_ITER_C) $(FIB_ITER_TGR)
-	@$(CC) -O2 -I$(RUNTIME_DIR) -o $(BIN_AOT_ITER) $(BIN_AOT_ITER_C) $(RUNTIME_DIR)/runtime.c
+	@echo "[aot] transpile+link iterative -> $@"
+	@$(BIN_AOT) -o $(BIN_DIR)/fib_cli.c $(FIB_ITER_TGR)
+	@echo "C emitted: $(BIN_DIR)/fib_cli.c"
+	@$(CC) $(CFLAGS) -o $@ $(BIN_DIR)/fib_cli.c $(RUNTIME_DIR)/runtime.c $(LDFLAGS)
 
+# Recursive
 $(BIN_AOT_REC): $(BIN_AOT) $(RUNTIME_DIR)/runtime.c $(RUNTIME_DIR)/runtime.h $(FIB_REC_TGR) | $(BIN_DIR)
-	@echo "[aot] transpile+link recursive -> $(BIN_AOT_REC)"
-	@$(BIN_AOT) -o $(BIN_AOT_REC_C) $(FIB_REC_TGR)
-	@$(CC) -O2 -I$(RUNTIME_DIR) -o $(BIN_AOT_REC) $(BIN_AOT_REC_C) $(RUNTIME_DIR)/runtime.c
+	@echo "[aot] transpile+link recursive -> $@"
+	@$(BIN_AOT) -o $(BIN_DIR)/fib_rec_cli.c $(FIB_REC_TGR)
+	@echo "C emitted: $(BIN_DIR)/fib_rec_cli.c"
+	@$(CC) $(CFLAGS) -o $@ $(BIN_DIR)/fib_rec_cli.c $(RUNTIME_DIR)/runtime.c $(LDFLAGS)
 
-.PHONY: aot-examples
 aot-examples: $(BIN_AOT_ITER) $(BIN_AOT_REC)
 
-# ─────────────────────────────────────────────────────────────
+# ----------------------------
 # Benchmarks
-# ─────────────────────────────────────────────────────────────
+# ----------------------------
+bench:
+	@echo "[build] done."
+	@$(GO) run ./cmd/benchfast/main.go
 
-.PHONY: bench
-bench: build
-	@$(GO) run ./cmd/benchfast
-
-.PHONY: bench-rebuild
-bench-rebuild:
+bench-rebuild: build aot-examples
 	@echo "[bench-rebuild] full rebuild, then bench"
-	@$(MAKE) -s build
-	@$(MAKE) -s aot-examples
-	@$(GO) run ./cmd/benchfast
+	@$(GO) run ./cmd/benchfast/main.go -rebuild
 
-# ─────────────────────────────────────────────────────────────
-# Housekeeping
-# ─────────────────────────────────────────────────────────────
-
-.PHONY: tidy
-tidy:
-	@$(GO) mod tidy
-
-.PHONY: clean
+# ----------------------------
+# Clean
+# ----------------------------
 clean:
 	@rm -rf $(BIN_DIR)
-
-.PHONY: veryclean
-veryclean: clean
-	@rm -rf $(BENCH_DIR)/runs $(BENCH_LATEST)
-
-# Convenience
-.PHONY: setup
-setup: tidy build aot-examples bench
+	@echo "[clean] $(BIN_DIR) removed."

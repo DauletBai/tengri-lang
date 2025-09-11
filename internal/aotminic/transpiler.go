@@ -1,5 +1,12 @@
 package aotminic
 
+// Minimal, example-only AOT transpiler that recognizes two demo sources
+// (fib_iter_cli.tgr / fib_rec_cli.tgr) and emits a small C program with
+// a matching fib implementation, runtime glue, and normalized timing.
+//
+// The emitted TIME_NS is PER CALL: total_ns / REPS, where
+// REPS = env("BENCH_REPS", default=5_000_000).
+
 import (
 	"errors"
 	"fmt"
@@ -8,103 +15,149 @@ import (
 	"strings"
 )
 
-// TranspileToC is a tiny demo "transpiler" that accepts two canonical sources:
-//   - .../fib_iter_cli.tgr  → iterative Fibonacci CLI in C
-//   - .../fib_rec_cli.tgr   → recursive Fibonacci CLI in C
+// TranspileToC emits a single C file at outC based on the source name.
+// It supports two demo patterns:
+//   * fib_iter_cli.tgr → iterative Fibonacci
+//   * fib_rec_cli.tgr  → recursive Fibonacci
 //
-// It emits a single C file that includes runtime timers and prints TIME_NS
-// in a unified format that benchfast understands.
-//
-// NOTE: This is a minimal PoC, not a full Tengri frontend. The .tgr contents
-// are not parsed; the filename is used as a switch.
-func TranspileToC(sourcePath string) (string, error) {
-	base := filepath.Base(sourcePath)
+// If 'force' is true, any other filename will be treated as iterative.
+func TranspileToC(srcPath, outC string, force bool) error {
+	base := filepath.Base(srcPath)
+	kind := detectKind(base, force)
+	if kind == kindUnknown {
+		return fmt.Errorf("cannot detect program kind (expected fib_iter(...) or fib_rec(...))")
+	}
+
+	c := buildC(kind)
+	if err := writeFile(outC, c); err != nil {
+		return err
+	}
+	return nil
+}
+
+type programKind int
+
+const (
+	kindUnknown programKind = iota
+	kindIter
+	kindRec
+)
+
+func detectKind(name string, force bool) programKind {
+	n := strings.ToLower(name)
 	switch {
-	case strings.Contains(base, "fib_iter_cli"):
-		return emitFibIterC(), nil
-	case strings.Contains(base, "fib_rec_cli"):
-		return emitFibRecC(), nil
+	case strings.Contains(n, "fib_iter"):
+		return kindIter
+	case strings.Contains(n, "fib_rec"):
+		return kindRec
 	default:
-		return "", errors.New("unsupported source pattern (mini-AOT demo expects fib_iter_cli / fib_rec_cli)")
+		if force {
+			return kindIter
+		}
+		return kindUnknown
 	}
 }
 
-// emitFibIterC generates an iterative Fibonacci CLI.
-// Includes are intentionally flat: #include "runtime.h".
-// The Makefile provides -Iinternal/aotminic/runtime so headers resolve regardless of CWD.
-func emitFibIterC() string {
-	return strings.TrimLeft(`
-#include "runtime.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
+func writeFile(path, data string) error {
+	if path == "" {
+		return errors.New("output path is empty")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(data), 0o644)
+}
 
-static unsigned long long fib_iter(unsigned long long n) {
+func buildC(kind programKind) string {
+	header := `#include "runtime.h"
+#include <stdlib.h>
+
+/* BENCH_REPS controls how many times the kernel runs.
+ * We normalize to per-call TIME_NS by dividing total_ns / reps.
+ */
+static long get_reps(void) {
+    const char* env = getenv("BENCH_REPS");
+    if (!env || !env[0]) return 5000000L; /* default */
+    char* end = NULL;
+    long v = strtol(env, &end, 10);
+    if (end == env || v <= 0) return 5000000L;
+    return v;
+}
+`
+
+	var fib string
+	switch kind {
+	case kindIter:
+		fib = `
+long long fib_iter(long long n) {
     if (n <= 1) return n;
-    unsigned long long a = 0, b = 1;
-    for (unsigned long long i = 2; i <= n; i++) {
-        unsigned long long t = a + b;
+    long long a = 0, b = 1;
+    for (long long i = 2; i <= n; i++) {
+        long long t = a + b;
         a = b;
         b = t;
     }
     return b;
 }
-
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        printf("usage: %s <N>\n", argv[0]);
-        return 1;
-    }
-    unsigned long long n = strtoull(argv[1], NULL, 10);
-
-    long start = time_ns();
-    unsigned long long result = fib_iter(n);
-    long end = time_ns();
-
-    // Unified benchfast-friendly output:
-    printf("%" PRIu64 "\n", (uint64_t)result);
-    print_time_ns(end - start);
-    return 0;
-}
-`, "\n")
-}
-
-// emitFibRecC generates a naive recursive Fibonacci CLI.
-func emitFibRecC() string {
-	return strings.TrimLeft(`
-#include "runtime.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-
-static unsigned long long fib_rec(unsigned long long n) {
-    if (n < 2) return n;
+`
+	case kindRec:
+		fib = `
+long long fib_rec(long long n) {
+    if (n <= 1) return n;
     return fib_rec(n - 1) + fib_rec(n - 2);
 }
+`
+	}
 
+	mainBodyIter := `
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        printf("usage: %s <N>\n", argv[0]);
-        return 1;
+    long n = argi(argc, argv, 1, 40); /* default N=40 */
+    long reps = get_reps();
+    volatile long long acc = 0;
+
+    long long start = time_ns();
+    for (long i = 0; i < reps; i++) {
+        acc += fib_iter(n);
     }
-    unsigned long long n = strtoull(argv[1], NULL, 10);
+    long long end = time_ns();
 
-    long start = time_ns();
-    unsigned long long result = fib_rec(n);
-    long end = time_ns();
+    print(acc ? fib_iter(n) : 0); /* print single-call RESULT */
 
-    // Unified benchfast-friendly output:
-    printf("%" PRIu64 "\n", (uint64_t)result);
-    print_time_ns(end - start);
+    long long total = end - start;
+    long long per   = (reps > 0) ? (total / reps) : 0;
+    print_time_ns(per);
     return 0;
 }
-`, "\n")
-}
+`
 
-// WriteFile is a small helper for tests/tools that want a file on disk.
-func WriteFile(path, content string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("mkdir: %w", err)
+	mainBodyRec := `
+int main(int argc, char** argv) {
+    long n = argi(argc, argv, 1, 34); /* default N=34 */
+    long reps = get_reps();
+    volatile long long acc = 0;
+
+    long long start = time_ns();
+    for (long i = 0; i < reps; i++) {
+        acc += fib_rec(n);
+    }
+    long long end = time_ns();
+
+    print(acc ? fib_rec(n) : 0); /* print single-call RESULT */
+
+    long long total = end - start;
+    long long per   = (reps > 0) ? (total / reps) : 0;
+    print_time_ns(per);
+    return 0;
+}
+`
+
+	switch kind {
+	case kindIter:
+		return header + fib + mainBodyIter
+	case kindRec:
+		return header + fib + mainBodyRec
+	default:
+		// Should not happen; detectKind filters this.
+		return header + "\nint main(){ return 1; }\n"
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
 }

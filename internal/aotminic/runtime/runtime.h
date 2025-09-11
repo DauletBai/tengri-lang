@@ -1,27 +1,23 @@
-#ifndef TENGRI_MINI_RUNTIME_H
-#define TENGRI_MINI_RUNTIME_H
+#ifndef TENGRI_RUNTIME_H
+#define TENGRI_RUNTIME_H
 
-#include <stdio.h>
-#include <time.h>
-#include <stdlib.h>
+#include <stddef.h>
 
-static inline long time_ns(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (long)ts.tv_sec * 1000000000L + (long)ts.tv_nsec;
-}
+/* CLI helpers */
+long argi(int argc, char **argv, int index, long def);
 
-static inline void print_time_ns(long ns) {
-    printf("TIME_NS: %ld\n", ns);
-}
+/* I/O */
+void print(long long v);
 
-static inline void print(long v) {
-    printf("%ld\n", v);
-}
+/* Timing (nanoseconds, monotonic) */
+long long time_ns(void);
+void print_time_ns(long long ns);
 
-static inline long argi(int argc, char** argv, int idx, long defv) {
-    if (argc > idx) return strtoll(argv[idx], NULL, 10);
-    return defv;
-}
+/*
+ * These are only declarations to silence implicit-prototype warnings.
+ * Definitions for fib_* come from the transpiled C (emitted by the AOT tool).
+ */
+long long fib_iter(long long n);
+long long fib_rec(long long n);
 
-#endif
+#endif /* TENGRI_RUNTIME_H */
