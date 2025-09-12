@@ -1,23 +1,31 @@
 #ifndef TENGRI_RUNTIME_H
 #define TENGRI_RUNTIME_H
 
-#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-/* CLI helpers */
-long argi(int argc, char **argv, int index, long def);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* I/O */
-void print(long long v);
+// Monotonic high-resolution timestamp in nanoseconds.
+int64_t tgr_time_ns(void);
 
-/* Timing (nanoseconds, monotonic) */
-long long time_ns(void);
-void print_time_ns(long long ns);
+// Read BENCH_REPS from env (default 1, clamp >= 1).
+int64_t tgr_bench_reps(void);
 
-/*
- * These are only declarations to silence implicit-prototype warnings.
- * Definitions for fib_* come from the transpiled C (emitted by the AOT tool).
- */
-long long fib_iter(long long n);
-long long fib_rec(long long n);
+// Print timing as required by benchfast.
+// elapsed_ns — полное время одного прогона (или суммарное) в наносекундах.
+// Если вы подаете суммарное за REP прогона, функция усреднит.
+void tgr_print_time_ns(int64_t elapsed_ns, int64_t reps);
 
-#endif /* TENGRI_RUNTIME_H */
+// Helpers used by transpiled code
+long tgr_argi(int argc, char** argv, int index, long def);
+void tgr_print_long(long v);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // TENGRI_RUNTIME_H

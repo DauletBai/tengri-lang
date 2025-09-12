@@ -1,19 +1,45 @@
-# build artefacts
+# ---- OS / editors -----------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+
+# ---- Go build artifacts -----------------------------------------------------
+*.test
+*.out
+coverage.*
+# go workspaces (если появится)
+go.work
+go.work.sum
+
+# ---- Project build/bin ------------------------------------------------------
 .bin/
-bin/
-dist/
+
+# ---- AOT-generated C and objects -------------------------------------------
+# общий случай
 *.o
 *.a
-*.out
+*.so
+# сгенерированные C-файлы (держим исходники, игнорим эмит)
+# если вы генерите не только в .bin, можно игнорить по шаблонам:
+.bin/*.c
+**/fib_*_cli.c
 
-# macOS junk
-.DS_Store
-*/.DS_Store
-__MACOSX/
-
-# benchmarks: храним только last CSV, графики регенерируем
+# ---- Benchmarks outputs -----------------------------------------------------
 benchmarks/runs/
 benchmarks/latest/plots/
+benchmarks/latest/results/*.csv
 
-# Go
-vendor/
+# Разрешить держать сами папки latest/* пустыми через .gitkeep
+!benchmarks/latest/
+!benchmarks/latest/results/
+!benchmarks/latest/plots/
+benchmarks/latest/results/.gitkeep
+benchmarks/latest/plots/.gitkeep
+
+# ---- Legacy/old layout (на случай остатков) --------------------------------
+02_*/
+03_compiler_go/
+04_benchmarks/
+05_vm_mini/
+06_aot_minic/
+tools/benchfast/

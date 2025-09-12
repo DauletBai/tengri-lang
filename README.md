@@ -17,10 +17,18 @@ It explores new approaches to **compilation, runtime efficiency, and digital sov
 .
 ├── benchmarks/          # Benchmarks and reference implementations
 │   └── src/             # Language-specific sources
-├── cmd/                 # CLI entry points (benchfast, VM, AOT)
+│       ├── fib_iter/    # Iterative Fibonacci (Go, Python, Tengri)
+│       └── fib_rec/     # Recursive Fibonacci (Go, Python, Tengri)
+├── cmd/                 # CLI entry points
+│   ├── benchfast/       # Benchmark runner
+│   ├── tengri-aot/      # AOT transpiler CLI
+│   └── tengri-vm/       # VM CLI
 ├── internal/            # Compiler, runtime, language internals
-├── docs/                # Documentation and philosophy
-├── scripts/             # Helper scripts
+│   ├── aotminic/        # AOT backend + runtime (C)
+│   └── lang/            # Lexer, parser, AST, evaluator
+├── docs/                # Documentation
+│   └── philosophy/      # Mission and vision
+├── scripts/             # Helper scripts (restructure, CI helpers, etc.)
 └── .bin/                # Built binaries (ignored in VCS)
 
 ---
