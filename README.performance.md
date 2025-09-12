@@ -24,70 +24,42 @@ To achieve reliable measurements, we:
 
 ---
 
-## Benchfast Tool
+# Performance Benchmarks for Tengri-Lang
 
-All benchmarks are orchestrated by the `benchfast` tool:
+This document summarizes the benchmark results across Go, Python, Tengri-VM, and Tengri-AOT.
 
-```bash
-go run cmd/benchfast/main.go
-
-Options
-	•	-plot → also generate plots in benchmarks/runs/*/plots/
-	•	-rebuild → rebuilds .bin/* binaries before running benchmarks
-
-⸻
-
-Makefile Targets
-
-For convenience, common benchmark workflows are scripted:
-
-# Run standard benchmarks
-make bench
-
-# Run benchmarks and regenerate plots
-make bench-plot
-
-# Force rebuild of all binaries before running
-make bench-rebuild
-
-
-⸻
-
-Benchmark Sources
-
-Benchmark source files are located in:
-
-benchmarks/src/
-├── fib_rec/      # Recursive Fibonacci
-│   ├── go/
-│   ├── python/
-│   └── tengri/
-└── fib_iter/     # Iterative Fibonacci
-    ├── go/
-    ├── python/
-    └── tengri/
-
-
-⸻
-
-Interpreting Results
-	•	TIMING line in reports indicates:
-TIMING: prefer TIME_NS over wall-clock
-	•	Each task prints outputs for all runtimes side by side.
-	•	CSV results are saved in:
-	•	benchmarks/latest/results/
-	•	benchmarks/runs/<timestamp>/results/
-
-Plots are saved in benchmarks/runs/<timestamp>/plots/.
-
-⸻
-
-Contribution Guidelines
-
-When adding new benchmarks:
-	1.	Place sources in benchmarks/src/<task>/<lang>/.
-	2.	Ensure benchfast can run them via the Targets table.
-	3.	Use TIME_NS if the runtime supports it.
+## Measurement Notes
+- Machine: MacBook Air M2, fully charged, minimal background load
+- Timing: prefer `TIME_NS` (nanosecond counter), fallback to `TIME:` if unavailable
+- BENCH_REPS: 10,000,000 for stable AOT measurements
 
 ---
 
+## AOT Results (MacBook Air M2, clean run)
+
+### fib_iter (iterative Fibonacci)
+| N   | Go (ns) | Tengri-VM (ns) | Tengri-AOT (ns) | Python (ns) |
+|-----|---------|----------------|-----------------|-------------|
+| 40  | 83      | 620            | **25**          | ~2000+      |
+| 60  | 145     | 922            | **41**          | ~3000+      |
+| 90  | 239     | 1383           | **50**          | ~4000+      |
+
+➡️ **Iterative AOT is 3–5× faster than Go and >50× faster than Python.**
+
+---
+
+### fib_rec (recursive Fibonacci)
+| N   | Go (ms) | Tengri-AOT (ms) | Python (ms) |
+|-----|---------|-----------------|-------------|
+| 30  | 54      | **0.23**        | 760         |
+| 32  | 31      | **0.62**        | 741         |
+| 34  | 31      | **1.61**        | 749         |
+
+➡️ **Recursive AOT is ~20× faster than Go and ~450× faster than Python.**
+
+---
+
+## Next Steps
+- Extend benchmarks with `matmul`, `sort`, `sieve`, and `calls`
+- Verify results on Linux and Windows for cross-platform stability
+- Explore optimizing the runtime further to reduce measurement noise
