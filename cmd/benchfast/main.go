@@ -146,15 +146,19 @@ func runOne(bin string, args []string, passEnv map[string]string) RunOutcome {
 	}
 }
 
+// --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
 func fmtTimeOutcome(o RunOutcome) (timeCol string, outCol string) {
 	// Compose the timing column and the "Output" column text (result/diagnostic)
 	switch {
 	case o.TimeNS != nil:
-		timeCol = fmt.Sprintf("%0.6f", float64(*o.TimeNS)/1e9)
+		// Отображаем наносекунды
+		timeCol = fmt.Sprintf("%d ns", *o.TimeNS)
 	case o.TimeS != nil:
-		timeCol = fmt.Sprintf("%0.6f", *o.TimeS)
+		// Если ns нет, показываем секунды (как раньше)
+		timeCol = fmt.Sprintf("%.6f s", *o.TimeS)
 	default:
-		timeCol = fmt.Sprintf("%0.6f", o.WallSec)
+		// В крайнем случае — wall-clock
+		timeCol = fmt.Sprintf("%.6f s (wall)", o.WallSec)
 	}
 	tag := "[OK]"
 	if !o.Ok {
@@ -363,11 +367,13 @@ func targetsFor(kind string) []Target {
 // Driver
 // -----------------------------
 
+// --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
 func runTask(title string, ns []int, kind string) ([]csvRow, error) {
 	fmt.Printf("\nTask = %s\n", title)
 	fmt.Println("──────────────────────────────────────────────────────────")
 	fmt.Println(timingNote)
-	fmt.Printf("%-20s %-10s %-12s\n\n", "Target", "Time (s)", "Output")
+	// Обновляем заголовок таблицы
+	fmt.Printf("%-20s %-15s %-12s\n\n", "Target", "Time", "Output")
 
 	rows := make([]csvRow, 0, len(ns)*6)
 	tgts := targetsFor(kind)
@@ -384,7 +390,7 @@ func runTask(title string, ns []int, kind string) ([]csvRow, error) {
 				available = t.OnlyIf()
 			}
 			if !available {
-				fmt.Printf("%-20s %-10s [SKIP] %s\n\n", t.Name, fmt.Sprintf("%0.6f", 0.0), t.SkipMsg)
+				fmt.Printf("%-20s %-15s [SKIP] %s\n\n", t.Name, "0 ns", t.SkipMsg)
 				rows = append(rows, csvRow{
 					Target: t.Name, N: n, TimeNS: "", TimeS: "", WallS: "0.000000", Result: "", Status: "SKIP",
 				})
@@ -402,7 +408,7 @@ func runTask(title string, ns []int, kind string) ([]csvRow, error) {
 
 			out := runOne(t.Bin, args, passEnv)
 			timeCol, outCol := fmtTimeOutcome(out)
-			fmt.Printf("%-20s %-10s %s\n\n", t.Name, timeCol, outCol)
+			fmt.Printf("%-20s %-15s %s\n\n", t.Name, timeCol, outCol)
 
 			row := csvRow{
 				Target: t.Name,
