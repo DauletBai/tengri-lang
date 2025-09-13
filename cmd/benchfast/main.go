@@ -3,424 +3,463 @@ package main
 import (
 	"bytes"
 	"encoding/csv"
-	"flag"
 	"fmt"
-	//"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
 
 // -----------------------------
-// Config & flags
+// Config
 // -----------------------------
 
-var (
-	flagRebuild   = flag.Bool("rebuild", false, "Rebuild all .bin targets before running benchmarks")
-	flagCSVDir    = flag.String("csvdir", "benchmarks/latest/results", "Directory to write CSV results")
-	flagRunsDir   = flag.String("runsdir", "benchmarks/runs", "Directory to store timestamped results")
-	flagNoColor   = flag.Bool("nocolor", false, "Disable ANSI colors in output")
-)
+// Ns for benchmark sets
+var fibIterNs = []int{40, 60, 90}
+var fibRecNs  = []int{30, 32, 34}
 
-var (
-	// Recursive task Ns (kept short because recursive fib explodes)
-	NsRec  = []int{30, 32, 34}
-	// Iterative task Ns (quick & scalable)
-	NsIter = []int{40, 60, 90}
-)
+// Where to save CSVs
+const runsRoot     = "benchmarks/runs"
+const latestRoot   = "benchmarks/latest"
+const resultsLeaf  = "results"
 
-const (
-	// Binaries we expect (built by -rebuild)
-	binFibRecGo  = ".bin/fib_rec_go"
-	binFibIterGo = ".bin/fib_iter_go"
-	binVM        = ".bin/vm"
-	binAOT       = ".bin/tengri-aot"
+// Table header note
+const timingNote = "TIMING: prefer TIME_NS over wall-clock; fallback to TIME:, then wall-clock"
 
-	// AOT-produced C/ELF binaries (also made by -rebuild)
-	binFibCLI     = ".bin/fib_cli"      // iterative
-	binFibRecCLI  = ".bin/fib_rec_cli"  // recursive
+// -----------------------------
+// Target model
+// -----------------------------
 
-	// Sources
-	srcGoFibRec      = "benchmarks/src/fib_rec/fibonacci.go"
-	srcGoFibIter     = "benchmarks/src/fib_iter/go/fibonacci_iter.go"
-	srcPyFibRec      = "benchmarks/src/fib_rec/fibonacci.py"
-	srcPyFibIter     = "benchmarks/src/fib_iter/python/fibonacci_iter.py"
-	srcTgrFibIter    = "benchmarks/src/fib_iter/tengri/fib_cli.tgr"
-	srcTgrFibRec     = "benchmarks/src/fib_rec/tengri/fib_rec_cli.tgr"
-	aotRuntimeC      = "internal/aotminic/runtime/runtime.c"
-	cmdVMMain        = "cmd/tengri-vm/main.go"
-	cmdAOTMain       = "cmd/tengri-aot/main.go"
-)
-
-type row struct {
-	target   string
-	seconds  float64
-	status   string // [OK]/[ERR]/[SKIP]
-	output   string // short preview or reason
-}
-
-type table struct {
-	taskName string
-	rows     []row
-}
-
-func main() {
-	flag.Parse()
-
-	ts := time.Now().Format("20060102-150405")
-	runDir := filepath.Join(*flagRunsDir, ts, "results")
-	must(os.MkdirAll(runDir, 0o755))
-	must(os.MkdirAll(*flagCSVDir, 0o755))
-
-	if *flagRebuild {
-		fmt.Println(gray("Rebuilding .bin targets…"))
-		if err := rebuildAll(); err != nil {
-			failf("rebuild failed: %v", err)
-		}
-	}
-
-	// --- fib_rec ---
-	recTable := runFibRec()
-	saveCSV(filepath.Join(runDir, "fib_rec.csv"), recTable)
-	saveCSV(filepath.Join(*flagCSVDir, "fib_rec.csv"), recTable)
-
-	// --- fib_iter ---
-	iterTable := runFibIter()
-	saveCSV(filepath.Join(runDir, "fib_iter.csv"), iterTable)
-	saveCSV(filepath.Join(*flagCSVDir, "fib_iter.csv"), iterTable)
+type Target struct {
+	Name      string
+	Kind      string // "iter" or "rec"
+	Bin       string
+	ArgsFn    func(n int) []string
+	OnlyIf    func() bool // optional existence/probe check; if nil -> assumed available
+	SkipMsg   string      // message to print when skipped
 }
 
 // -----------------------------
-// Rebuild pipeline
+// Utilities
 // -----------------------------
 
-func rebuildAll() error {
-	// 1) Build Go baselines
-	if err := sh("go", "build", "-o", binFibRecGo, srcGoFibRec); err != nil {
-		return fmt.Errorf("build fib_rec_go: %w", err)
-	}
-	if err := sh("go", "build", "-tags=iter", "-o", binFibIterGo, srcGoFibIter); err != nil {
-		return fmt.Errorf("build fib_iter_go: %w", err)
-	}
-
-	// 2) Build VM mini (optional for iter timing)
-	if fileExists(cmdVMMain) {
-		if err := sh("go", "build", "-o", binVM, cmdVMMain); err != nil {
-			return fmt.Errorf("build vm: %w", err)
-		}
-	}
-
-	// 3) Build AOT transpiler
-	if fileExists(cmdAOTMain) {
-		if err := sh("go", "build", "-o", binAOT, cmdAOTMain); err != nil {
-			return fmt.Errorf("build tengri-aot: %w", err)
-		}
-		// 4) Transpile TGR → C and compile C with runtime
-		if err := aotProduce(binFibCLI, srcTgrFibIter); err != nil {
-			return err
-		}
-		if err := aotProduce(binFibRecCLI, srcTgrFibRec); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func aotProduce(outBin, srcTgr string) error {
-	cFile := strings.TrimSuffix(outBin, filepath.Ext(outBin)) + ".c"
-	if err := sh(binAOT, srcTgr, "-o", cFile); err != nil {
-		return fmt.Errorf("aot transpile %s: %w", srcTgr, err)
-	}
-	if err := sh("clang", "-O2", "-o", outBin, cFile, aotRuntimeC); err != nil {
-		return fmt.Errorf("clang link %s: %w", outBin, err)
-	}
-	return nil
-}
-
-// -----------------------------
-// Fib (recursive)
-// -----------------------------
-
-func runFibRec() table {
-	tbl := table{taskName: "fib_rec"}
-	fmt.Println()
-	fmt.Println(bold("Task = fib_rec"))
-	fmt.Println(line())
-	fmt.Println(gray("TIMING: prefer TIME_NS over wall-clock; fallback to TIME:, then wall-clock"))
-
-	// Header
-	fmt.Println(bandHeader())
-
-	for _, N := range NsRec {
-		fmt.Println()
-		fmt.Printf("N = %d\n", N)
-		fmt.Println(line())
-		// go (prebuilt)
-		{
-			sec, out, status := runAndParse(binFibRecGo, nil)
-			tbl.rows = append(tbl.rows, row{"go", sec, status, out})
-			fmt.Println(formatRow("go", sec, status, out))
-		}
-		// tengri-ast (disabled in new layout)
-		{
-			tbl.rows = append(tbl.rows, row{"tengri-ast", 0, "SKIP", "SKIP: AST is disabled in the new layout"})
-			fmt.Println(formatRow("tengri-ast", 0, "SKIP", "SKIP: AST is disabled in the new layout"))
-		}
-		// python
-		{
-			if fileExists(srcPyFibRec) {
-				sec, out, status := runAndParse("python3", []string{srcPyFibRec})
-				tbl.rows = append(tbl.rows, row{"python", sec, status, out})
-				fmt.Println(formatRow("python", sec, status, out))
-			} else {
-				tbl.rows = append(tbl.rows, row{"python", 0, "SKIP", "SKIP: " + srcPyFibRec + " missing"})
-				fmt.Println(formatRow("python", 0, "SKIP", "SKIP: "+srcPyFibRec+" missing"))
-			}
-		}
-		// vm (not applicable)
-		{
-			tbl.rows = append(tbl.rows, row{"vm", 0, "SKIP", "SKIP: vm supports fib_iter only"})
-			fmt.Println(formatRow("vm", 0, "SKIP", "SKIP: vm supports fib_iter only"))
-		}
-		// tengri-aot (prebuilt fib_rec_cli expects N)
-		{
-			if fileExists(binFibRecCLI) {
-				sec, out, status := runAndParse(binFibRecCLI, []string{fmt.Sprint(N)})
-				tbl.rows = append(tbl.rows, row{"tengri-aot", sec, status, out})
-				fmt.Println(formatRow("tengri-aot", sec, status, out))
-			} else {
-				tbl.rows = append(tbl.rows, row{"tengri-aot", 0, "ERR", "AOT binary missing: " + binFibRecCLI})
-				fmt.Println(formatRow("tengri-aot", 0, "ERR", "AOT binary missing: "+binFibRecCLI))
-			}
-		}
-	}
-	fmt.Println(saveNote("fib_rec"))
-	return tbl
-}
-
-// -----------------------------
-// Fib (iterative)
-// -----------------------------
-
-func runFibIter() table {
-	tbl := table{taskName: "fib_iter"}
-	fmt.Println()
-	fmt.Println(bold("Task = fib_iter"))
-	fmt.Println(line())
-	fmt.Println(gray("TIMING: prefer TIME_NS over wall-clock; fallback to TIME:, then wall-clock"))
-	fmt.Println(bandHeader())
-
-	for _, N := range NsIter {
-		fmt.Println()
-		fmt.Printf("N = %d\n", N)
-		fmt.Println(line())
-
-		// go (prebuilt, accepts N)
-		{
-			sec, out, status := runAndParse(binFibIterGo, []string{fmt.Sprint(N)})
-			tbl.rows = append(tbl.rows, row{"go", sec, status, out})
-			fmt.Println(formatRow("go", sec, status, out))
-		}
-		// tengri-ast (disabled)
-		{
-			tbl.rows = append(tbl.rows, row{"tengri-ast", 0, "SKIP", "SKIP: AST is disabled in the new layout"})
-			fmt.Println(formatRow("tengri-ast", 0, "SKIP", "SKIP: AST is disabled in the new layout"))
-		}
-		// python (accepts N)
-		{
-			if fileExists(srcPyFibIter) {
-				sec, out, status := runAndParse("python3", []string{srcPyFibIter, fmt.Sprint(N)})
-				tbl.rows = append(tbl.rows, row{"python", sec, status, out})
-				fmt.Println(formatRow("python", sec, status, out))
-			} else {
-				tbl.rows = append(tbl.rows, row{"python", 0, "SKIP", "SKIP: " + srcPyFibIter + " missing"})
-				fmt.Println(formatRow("python", 0, "SKIP", "SKIP: "+srcPyFibIter+" missing"))
-			}
-		}
-		// vm (accepts N)
-		{
-			if fileExists(binVM) {
-				sec, out, status := runAndParse(binVM, []string{fmt.Sprint(N)})
-				tbl.rows = append(tbl.rows, row{"vm", sec, status, out})
-				fmt.Println(formatRow("vm", sec, status, out))
-			} else {
-				tbl.rows = append(tbl.rows, row{"vm", 0, "ERR", "vm binary missing: " + binVM})
-				fmt.Println(formatRow("vm", 0, "ERR", "vm binary missing: "+binVM))
-			}
-		}
-		// tengri-aot (accepts N)
-		{
-			if fileExists(binFibCLI) {
-				sec, out, status := runAndParse(binFibCLI, []string{fmt.Sprint(N)})
-				tbl.rows = append(tbl.rows, row{"tengri-aot", sec, status, out})
-				fmt.Println(formatRow("tengri-aot", sec, status, out))
-			} else {
-				tbl.rows = append(tbl.rows, row{"tengri-aot", 0, "ERR", "AOT binary missing: " + binFibCLI})
-				fmt.Println(formatRow("tengri-aot", 0, "ERR", "AOT binary missing: "+binFibCLI))
-			}
-		}
-	}
-	fmt.Println(saveNote("fib_iter"))
-	return tbl
-}
-
-// -----------------------------
-// Runner & parsing
-// -----------------------------
-
-var (
-	reTimeNS = regexp.MustCompile(`(?m)TIME_NS:\s*([0-9]+)`)
-	reTime   = regexp.MustCompile(`(?m)TIME:\s*([0-9]*\.?[0-9]+)`)
-)
-
-func runAndParse(cmd string, args []string) (seconds float64, preview string, status string) {
-	if !fileExists(cmd) && !isInPath(cmd) {
-		return 0, "missing: " + cmd, "SKIP"
-	}
-	start := time.Now()
-	out, err := run(cmd, args...)
-	wall := time.Since(start).Seconds()
-
-	// Prefer TIME_NS
-	if m := reTimeNS.FindStringSubmatch(out); len(m) == 2 {
-		ns, _ := parseInt64(m[1])
-		return float64(ns) / 1e9, clip(out), markStatus(out, err)
-	}
-	// Fallback to TIME:
-	if m := reTime.FindStringSubmatch(out); len(m) == 2 {
-		f, _ := parseFloat(m[1])
-		return f, clip(out), markStatus(out, err)
-	}
-	// Else wall-clock
-	return wall, clip(out), markStatus(out, err)
-}
-
-func markStatus(out string, err error) string {
-	if err != nil {
-		return "ERR"
-	}
-	// Parser diagnostic auto-detect (ru messages)
-	if strings.Contains(out, "Ошибка парсера") ||
-		strings.Contains(out, "не найдена функция для разбора токена") ||
-		strings.Contains(out, "ошибка: ожидался") {
-		return "ERR"
-	}
-	return "OK"
-}
-
-// -----------------------------
-// CSV
-// -----------------------------
-
-func saveCSV(path string, tbl table) {
-	must(os.MkdirAll(filepath.Dir(path), 0o755))
-	f, err := os.Create(path)
-	must(err)
-	defer f.Close()
-
-	w := csv.NewWriter(f)
-	defer w.Flush()
-
-	must(w.Write([]string{"task", "target", "seconds", "status"}))
-	for _, r := range tbl.rows {
-		must(w.Write([]string{
-			tbl.taskName, r.target, fmt.Sprintf("%.9f", r.seconds), r.status,
-		}))
-	}
-	fmt.Println(gray(fmt.Sprintf("CSV saved: %s", path)))
-}
-
-// -----------------------------
-// Utils: exec, fmt, etc.
-// -----------------------------
-
-func run(cmd string, args ...string) (string, error) {
-	c := exec.Command(cmd, args...)
-	var buf bytes.Buffer
-	c.Stdout = &buf
-	c.Stderr = &buf
-	err := c.Run()
-	return buf.String(), err
-}
-
-func sh(cmd string, args ...string) error {
-	c := exec.Command(cmd, args...)
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	return c.Run()
-}
-
-func must(err error) {
-	if err != nil {
-		failf("%v", err)
-	}
-}
-
-func failf(format string, a ...any) {
-	fmt.Fprintf(os.Stderr, "benchfast: "+format+"\n", a...)
-	os.Exit(1)
-}
-
-func parseInt64(s string) (int64, error) {
-	var x int64
-	_, err := fmt.Sscan(s, &x)
-	return x, err
-}
-
-func parseFloat(s string) (float64, error) {
-	var f float64
-	_, err := fmt.Sscan(s, &f)
-	return f, err
-}
-
-func fileExists(path string) bool {
-	st, err := os.Stat(path)
-	return err == nil && !st.IsDir()
-}
-
-func isInPath(bin string) bool {
-	_, err := exec.LookPath(bin)
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
 	return err == nil
 }
 
-func clip(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) > 70 {
-		return s[:70] + "..."
+func ensureDir(p string) error {
+	return os.MkdirAll(p, 0o755)
+}
+
+func nowStamp() string {
+	return time.Now().Format("20060102-150405")
+}
+
+type RunOutcome struct {
+	WallSec float64
+	Ok      bool
+	Reason  string  // [OK] / [ERR] / [SKIP] reason
+	Output  string  // raw stdout
+	Result  string  // parsed "RESULT" or numeric last line (for AOT)
+	TimeNS  *int64  // parsed TIME_NS if present
+	TimeS   *float64 // parsed TIME: seconds if present
+}
+
+var reTimeNS = regexp.MustCompile(`(?m)^\s*TIME_NS:\s*([0-9]+)\s*$`)
+var reTimeS  = regexp.MustCompile(`(?m)^\s*TIME:\s*([0-9]*\.?[0-9]+)\s*$`)
+var reResult = regexp.MustCompile(`(?m)^\s*(?:RESULT:\s*)?(-?[0-9]+)\s*$`)
+
+// parsePrefTiming extracts TIME_NS (preferred) or TIME:, plus a plausible RESULT-like line for display.
+func parsePrefTiming(out string) (timeNS *int64, timeS *float64, result string) {
+	if m := reTimeNS.FindStringSubmatch(out); len(m) == 2 {
+		v := mustParseInt64(m[1])
+		timeNS = &v
 	}
-	return s
-}
-
-func bandHeader() string {
-	return fmt.Sprintf("%-20s %-10s  %s", "Target", "Time (s)", "Output")
-}
-
-func formatRow(target string, sec float64, status, out string) string {
-	statusTag := "[" + status + "]"
-	return fmt.Sprintf("%-20s %-10.6f  %s %s", target, sec, statusTag, out)
-}
-
-func line() string {
-	return strings.Repeat("─", 58)
-}
-
-func bold(s string) string {
-	if *flagNoColor {
-		return s
+	if timeNS == nil { // fallback to TIME:
+		if m := reTimeS.FindStringSubmatch(out); len(m) == 2 {
+			fv := mustParseFloat(m[1])
+			timeS = &fv
+		}
 	}
-	return "\033[1m" + s + "\033[0m"
-}
-
-func gray(s string) string {
-	if *flagNoColor {
-		return s
+	// Try to grab a RESULT-looking number (prefer a line starting with RESULT:, else last standalone number)
+	if m := reResult.FindAllStringSubmatch(out, -1); len(m) > 0 {
+		result = m[len(m)-1][1]
 	}
-	return "\033[90m" + s + "\033[0m"
+	return
 }
 
-func saveNote(task string) string {
-	return gray(fmt.Sprintf("CSV saved: benchmarks/runs/<TS>/results/%s.csv and benchmarks/latest/results/%s.csv", task, task))
+func mustParseInt64(s string) int64 {
+	var v int64
+	fmt.Sscan(s, &v)
+	return v
+}
+
+func mustParseFloat(s string) float64 {
+	var f float64
+	fmt.Sscan(s, &f)
+	return f
+}
+
+// runOne runs the binary with args, captures stdout/stderr, and returns timing info.
+// It prefers embedded TIME_NS / TIME: from the program output; otherwise uses wall clock.
+func runOne(bin string, args []string, passEnv map[string]string) RunOutcome {
+	var outB, errB bytes.Buffer
+	cmd := exec.Command(bin, args...)
+	cmd.Stdout = &outB
+	cmd.Stderr = &errB
+
+	// Inherit env + overlay passEnv
+	env := os.Environ()
+	for k, v := range passEnv {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	cmd.Env = env
+
+	t0 := time.Now()
+	err := cmd.Run()
+	elapsed := time.Since(t0)
+	out := outB.String() + errB.String()
+
+	if err != nil {
+		return RunOutcome{
+			WallSec: elapsed.Seconds(),
+			Ok:      false,
+			Reason:  fmt.Sprintf("ERR: %v", err),
+			Output:  out,
+		}
+	}
+
+	tNS, tS, res := parsePrefTiming(out)
+
+	return RunOutcome{
+		WallSec: elapsed.Seconds(),
+		Ok:      true,
+		Reason:  "OK",
+		Output:  out,
+		Result:  res,
+		TimeNS:  tNS,
+		TimeS:   tS,
+	}
+}
+
+func fmtTimeOutcome(o RunOutcome) (timeCol string, outCol string) {
+	// Compose the timing column and the "Output" column text (result/diagnostic)
+	switch {
+	case o.TimeNS != nil:
+		timeCol = fmt.Sprintf("%0.6f", float64(*o.TimeNS)/1e9)
+	case o.TimeS != nil:
+		timeCol = fmt.Sprintf("%0.6f", *o.TimeS)
+	default:
+		timeCol = fmt.Sprintf("%0.6f", o.WallSec)
+	}
+	tag := "[OK]"
+	if !o.Ok {
+		tag = "[ERR]"
+	}
+	if !o.Ok && strings.HasPrefix(o.Reason, "SKIP") {
+		tag = "[SKIP]"
+	}
+	if o.Result != "" && tag == "[OK]" {
+		outCol = fmt.Sprintf("%s %s", tag, o.Result)
+	} else {
+		// show short reason (OK/ERR/SKIP + maybe short message)
+		outCol = tag
+		if o.Reason != "" && tag != "[OK]" {
+			outCol += " " + o.Reason
+		}
+	}
+	return
+}
+
+// CSV writer helper
+type csvRow struct {
+	Target string
+	N      int
+	TimeNS string // keep as string; if empty — NA
+	TimeS  string // same
+	WallS  string
+	Result string
+	Status string // OK/ERR/SKIP
+}
+
+func writeCSV(rows []csvRow, taskName string, ts string) error {
+	// runs/<TS>/results and latest/results
+	destRun := filepath.Join(runsRoot, ts, resultsLeaf)
+	destLatest := filepath.Join(latestRoot, resultsLeaf)
+	for _, d := range []string{destRun, destLatest} {
+		if err := ensureDir(d); err != nil {
+			return err
+		}
+	}
+
+	filename := func(root string) string {
+		return filepath.Join(root, fmt.Sprintf("%s.csv", taskName))
+	}
+
+	writeTo := func(root string) error {
+		f, err := os.Create(filename(root))
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		w := csv.NewWriter(f)
+		defer w.Flush()
+
+		_ = w.Write([]string{"target", "N", "time_ns", "time_s", "wall_s", "result", "status"})
+		for _, r := range rows {
+			if err := w.Write([]string{
+				r.Target,
+				fmt.Sprintf("%d", r.N),
+				r.TimeNS,
+				r.TimeS,
+				r.WallS,
+				r.Result,
+				r.Status,
+			}); err != nil {
+				return err
+			}
+		}
+		return w.Error()
+	}
+
+	if err := writeTo(destRun); err != nil {
+		return err
+	}
+	if err := writeTo(destLatest); err != nil {
+		return err
+	}
+	fmt.Printf("CSV saved: %s and %s\n", filepath.Join(runsRoot, "<TS>", resultsLeaf, taskName+".csv"), filepath.Join(latestRoot, resultsLeaf, taskName+".csv"))
+	fmt.Printf("CSV saved: %s\n", filepath.Join(runsRoot, ts, resultsLeaf, taskName+".csv"))
+	fmt.Printf("CSV saved: %s\n", filepath.Join(latestRoot, resultsLeaf, taskName+".csv"))
+	return nil
+}
+
+// -----------------------------
+// Targets registry
+// -----------------------------
+
+func availableOr(path, skip string) (func() bool, string) {
+	return func() bool { return fileExists(path) }, skip
+}
+
+func targetsFor(kind string) []Target {
+	var t []Target
+
+	// Go
+	if kind == "iter" {
+		t = append(t, Target{
+			Name: "go",
+			Kind: "iter",
+			Bin:  ".bin/fib_iter_go",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_iter_go") },
+			SkipMsg: "go fib_iter binary missing",
+		})
+	} else {
+		t = append(t, Target{
+			Name: "go",
+			Kind: "rec",
+			Bin:  ".bin/fib_rec_go",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_rec_go") },
+			SkipMsg: "go fib_rec binary missing",
+		})
+	}
+
+	// VM (iter only)
+	if kind == "iter" {
+		t = append(t, Target{
+			Name: "vm",
+			Kind: "iter",
+			Bin:  ".bin/vm",
+			ArgsFn: func(n int) []string {
+				// existing vm expects fib_iter only; pass N as arg
+				return []string{"fib_iter", fmt.Sprintf("%d", n)}
+			},
+			OnlyIf: func() bool { return fileExists(".bin/vm") },
+			SkipMsg: "vm supports fib_iter only",
+		})
+	}
+
+	// AOT
+	if kind == "iter" {
+		t = append(t, Target{
+			Name: "tengri-aot",
+			Kind: "iter",
+			Bin:  ".bin/fib_cli",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_cli") },
+			SkipMsg: "AOT binary missing: .bin/fib_cli",
+		})
+	} else {
+		t = append(t, Target{
+			Name: "tengri-aot",
+			Kind: "rec",
+			Bin:  ".bin/fib_rec_cli",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_rec_cli") },
+			SkipMsg: "AOT binary missing: .bin/fib_rec_cli",
+		})
+	}
+
+	// Optional C/C++
+	if kind == "iter" {
+		t = append(t, Target{
+			Name: "c",
+			Kind: "iter",
+			Bin:  ".bin/fib_iter_c",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_iter_c") },
+			SkipMsg: "C binary missing: .bin/fib_iter_c",
+		})
+	} else {
+		t = append(t, Target{
+			Name: "c",
+			Kind: "rec",
+			Bin:  ".bin/fib_rec_c",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_rec_c") },
+			SkipMsg: "C binary missing: .bin/fib_rec_c",
+		})
+	}
+
+	// Optional Rust
+	if kind == "iter" {
+		t = append(t, Target{
+			Name: "rust",
+			Kind: "iter",
+			Bin:  ".bin/fib_iter_rs",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_iter_rs") },
+			SkipMsg: "Rust binary missing: .bin/fib_iter_rs",
+		})
+	} else {
+		t = append(t, Target{
+			Name: "rust",
+			Kind: "rec",
+			Bin:  ".bin/fib_rec_rs",
+			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
+			OnlyIf: func() bool { return fileExists(".bin/fib_rec_rs") },
+			SkipMsg: "Rust binary missing: .bin/fib_rec_rs",
+		})
+	}
+
+	// Stable order in output
+	sort.SliceStable(t, func(i, j int) bool {
+		order := map[string]int{
+			"go": 0, "vm": 1, "tengri-aot": 2, "c": 3, "rust": 4,
+		}
+		return order[t[i].Name] < order[t[j].Name]
+	})
+	return t
+}
+
+// -----------------------------
+// Driver
+// -----------------------------
+
+func runTask(title string, ns []int, kind string) ([]csvRow, error) {
+	fmt.Printf("\nTask = %s\n", title)
+	fmt.Println("──────────────────────────────────────────────────────────")
+	fmt.Println(timingNote)
+	fmt.Printf("%-20s %-10s %-12s\n\n", "Target", "Time (s)", "Output")
+
+	rows := make([]csvRow, 0, len(ns)*6)
+	tgts := targetsFor(kind)
+
+	for _, n := range ns {
+		fmt.Printf("N = %d\n", n)
+		fmt.Println("──────────────────────────────────────────────────────────")
+		for _, t := range tgts {
+			if t.Kind != kind {
+				continue
+			}
+			available := true
+			if t.OnlyIf != nil {
+				available = t.OnlyIf()
+			}
+			if !available {
+				fmt.Printf("%-20s %-10s [SKIP] %s\n\n", t.Name, fmt.Sprintf("%0.6f", 0.0), t.SkipMsg)
+				rows = append(rows, csvRow{
+					Target: t.Name, N: n, TimeNS: "", TimeS: "", WallS: "0.000000", Result: "", Status: "SKIP",
+				})
+				continue
+			}
+			args := []string{}
+			if t.ArgsFn != nil {
+				args = t.ArgsFn(n)
+			}
+			// Pass through BENCH_REPS if user set it
+			passEnv := map[string]string{}
+			if v := os.Getenv("BENCH_REPS"); v != "" {
+				passEnv["BENCH_REPS"] = v
+			}
+
+			out := runOne(t.Bin, args, passEnv)
+			timeCol, outCol := fmtTimeOutcome(out)
+			fmt.Printf("%-20s %-10s %s\n\n", t.Name, timeCol, outCol)
+
+			row := csvRow{
+				Target: t.Name,
+				N:      n,
+				Result: out.Result,
+				Status: "OK",
+				WallS:  fmt.Sprintf("%0.6f", out.WallSec),
+			}
+			if !out.Ok {
+				row.Status = "ERR"
+			}
+			if out.TimeNS != nil {
+				row.TimeNS = fmt.Sprintf("%d", *out.TimeNS)
+			}
+			if out.TimeS != nil {
+				row.TimeS = fmt.Sprintf("%0.9f", *out.TimeS)
+			}
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
+}
+
+func main() {
+	// Ensure roots exist
+	_ = ensureDir(filepath.Join(latestRoot, resultsLeaf))
+
+	ts := nowStamp()
+
+	var allErrs []error
+
+	// fib_rec
+	recRows, err := runTask("fib_rec", fibRecNs, "rec")
+	if err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := writeCSV(recRows, "fib_rec", ts); err != nil {
+		allErrs = append(allErrs, err)
+	}
+
+	// fib_iter
+	iterRows, err := runTask("fib_iter", fibIterNs, "iter")
+	if err != nil {
+		allErrs = append(allErrs, err)
+	}
+	if err := writeCSV(iterRows, "fib_iter", ts); err != nil {
+		allErrs = append(allErrs, err)
+	}
+
+	if len(allErrs) > 0 {
+		var b strings.Builder
+		for _, e := range allErrs {
+			b.WriteString(e.Error())
+			b.WriteString("; ")
+		}
+		// return non-zero to signal overall issues
+		fmt.Fprintln(os.Stderr, "benchfast finished with errors:", b.String())
+		os.Exit(1)
+	}
 }

@@ -27,7 +27,9 @@ go.work.sum
 # ---- Benchmarks outputs -----------------------------------------------------
 benchmarks/runs/
 benchmarks/latest/plots/
-benchmarks/latest/results/*.csv
+# Allow latest results to be committed for visibility
+!benchmarks/latest/results/fib_iter.csv
+!benchmarks/latest/results/fib_rec.csv
 
 # Разрешить держать сами папки latest/* пустыми через .gitkeep
 !benchmarks/latest/
@@ -35,11 +37,3 @@ benchmarks/latest/results/*.csv
 !benchmarks/latest/plots/
 benchmarks/latest/results/.gitkeep
 benchmarks/latest/plots/.gitkeep
-
-# ---- Legacy/old layout (на случай остатков) --------------------------------
-02_*/
-03_compiler_go/
-04_benchmarks/
-05_vm_mini/
-06_aot_minic/
-tools/benchfast/

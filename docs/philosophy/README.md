@@ -35,11 +35,11 @@ To test this hypothesis, we are building the Tengri language ecosystem in four d
 3.  **JIT (Just-In-Time) Compiler:** A tiered JIT compiler will be built on top of the VM. It will identify and compile "hot" code paths into native machine code at runtime, dramatically reducing the gap with fully compiled languages.
 4.  **AOT (Ahead-of-Time) Compiler:** The final stage is a full AOT compiler, likely leveraging an existing backend like LLVM. This will produce highly optimized, standalone executables with performance competitive with languages like Go and Rust.
 
-## 4. Early Results: A Validation of the Thesis
+## 4. Results: A Validation of the Thesis
 
-Our initial benchmarks already provide strong evidence supporting our hypothesis. By comparing our AST interpreter and prototype VM against native Go and Python, we have observed:
+Our latest benchmarks provide strong evidence supporting our hypothesis. By comparing our AOT compiler and VM against native Go, C, and Rust, we have validated our architectural approach.
 
-* Our **AST interpreter**, despite its inherent slowness, is already **significantly faster than Python** in recursion-heavy tasks.
-* Our prototype **Bytecode VM** demonstrates performance that is **orders of magnitude faster than Python** and **nearly on par with native Go** for iterative, compute-bound tasks.
+-   Our **AOT compiler** demonstrates performance that is **directly competitive with C and Rust** in both recursion-heavy and iteration-heavy tasks.
+-   Our **Bytecode VM** shows excellent performance for a non-native backend, confirming its place as a fast interpreter in our performance roadmap (`AST → VM → JIT → AOT`).
 
-These results validate that our architectural choices are sound and that the performance goals are achievable. For detailed, reproducible results, please see the [**Benchmarks section in our main README**](../../README.md#live-benchmarks).
+These results confirm that our architectural choices are sound and that the performance goals of the project are achievable. For detailed, reproducible results, please see the [**Benchmarks section in our main README**](../../README.md).

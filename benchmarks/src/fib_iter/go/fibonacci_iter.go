@@ -1,5 +1,3 @@
-//go:build iter
-
 package main
 
 import (
