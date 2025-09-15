@@ -1,82 +1,198 @@
-// go_compiler/lexer/lexer.go
+// FILE: internal/lang/lexer/lexer.go
+// Purpose: UTF-8 aware lexer for Tengri language. Handles Kazakh keywords and ASCII operators.
+// Notes: Unicode letters allowed in identifiers; whitespace skipping uses unicode.IsSpace.
+
 package lexer
 
 import (
-	"github.com/DauletBai/tengri-lang/internal/lang/token"
 	"unicode"
+	"unicode/utf8"
+
+	"github.com/DauletBai/tengri-lang/internal/lang/token"
 )
+
 type Lexer struct {
-	input        []rune
-	position     int
-	readPosition int
-	ch           rune
+	input        string
+	position     int  // current read position (byte index) of current rune
+	readPosition int  // next read position (byte index)
+	ch           rune // current rune
 }
 
 func New(input string) *Lexer {
-	l := &Lexer{input: []rune(input)}
+	l := &Lexer{input: input}
 	l.readChar()
 	return l
 }
 
+// readChar advances by one UTF-8 rune.
 func (l *Lexer) readChar() {
 	if l.readPosition >= len(l.input) {
 		l.ch = 0
-	} else {
-		l.ch = l.input[l.readPosition]
+		l.position = l.readPosition
+		return
 	}
+	r, size := utf8.DecodeRuneInString(l.input[l.readPosition:])
+	l.ch = r
 	l.position = l.readPosition
-	l.readPosition += 1
+	l.readPosition += size
 }
 
 func (l *Lexer) peekChar() rune {
 	if l.readPosition >= len(l.input) {
 		return 0
 	}
-	return l.input[l.readPosition]
+	r, _ := utf8.DecodeRuneInString(l.input[l.readPosition:])
+	return r
+}
+
+func (l *Lexer) skipWhitespace() {
+	for unicode.IsSpace(l.ch) {
+		l.readChar()
+	}
+}
+
+func isLetter(ch rune) bool {
+	if ch == '_' || ch == '\'' { // allow underscore and apostrophe
+		return true
+	}
+	return unicode.IsLetter(ch)
+}
+
+func (l *Lexer) readIdentifier() string {
+	start := l.position
+	for isLetter(l.ch) || unicode.IsDigit(l.ch) {
+		l.readChar()
+	}
+	return l.input[start:l.position]
+}
+
+func (l *Lexer) readNumber() string {
+	start := l.position
+	for unicode.IsDigit(l.ch) {
+		l.readChar()
+	}
+	return l.input[start:l.position]
+}
+
+func (l *Lexer) readString() string {
+	// move past opening quote
+	l.readChar()
+	start := l.position
+	for l.ch != '"' && l.ch != 0 {
+		l.readChar()
+	}
+	s := l.input[start:l.position]
+	return s
+}
+
+func newToken(tt token.TokenType, ch rune) token.Token {
+	return token.Token{Type: tt, Literal: string(ch)}
+}
+
+// Keywords table
+var keywords = map[string]token.TokenType{
+	"jasa":    token.JASA,
+	"bekit":   token.BEKIT,
+	"atqar'm": token.ATQARM,
+	"qaıtar":  token.QAITAR,
+	"eger":    token.EGER,
+	"áıtpece": token.AITPECE,
+	"ázirshe": token.AZIRSHE,
+	"jan":     token.JAN,
+	"j'n":     token.JYN,
+	"kórset":  token.KORSET,
+	"san":     token.SAN,
+	"bólshek": token.BOLSHEK,
+	"jol":     token.JOL,
+	"tańba":   token.TANBA,
+	"aqıqat":  token.AQIQAT,
+	"j'i'm":   token.JYIM,
+}
+
+func LookupIdent(ident string) token.TokenType {
+	if tok, ok := keywords[ident]; ok {
+		return tok
+	}
+	return token.Identifier
 }
 
 func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
-
-	l.skipWhitespace() // Пропускаем шум ПЕРЕД каждым токеном
+	l.skipWhitespace()
 
 	switch l.ch {
-	// Полный список Рун, Операторов и Разделителей
-	case 'Π': tok = newToken(token.Runa_Func_Def, l.ch)
-	case '—': tok = newToken(token.Runa_Var, l.ch)
-	case 'Λ': tok = newToken(token.Runa_Const, l.ch)
-	case 'Y': tok = newToken(token.Runa_If, l.ch)
-	case 'Q': tok = newToken(token.Runa_True, l.ch)
-	case 'I': tok = newToken(token.Runa_False, l.ch)
-	case '↻': tok = newToken(token.Runa_Loop, l.ch)
-	case '→': tok = newToken(token.Runa_Return, l.ch)
-	case '⁞': tok = newToken(token.SEMICOLON, l.ch)
-	case '□': tok = newToken(token.Runa_Type_Int, l.ch)
-	case '⊡': tok = newToken(token.Runa_Type_Float, l.ch)
-	case '∞': tok = newToken(token.Runa_Type_Str, l.ch)
-	case '◇': tok = newToken(token.Runa_Type_Char, l.ch)
-	case '≡': tok = newToken(token.Runa_Type_Collection, l.ch)
-	case ':': tok = newToken(token.Op_Assign, l.ch)
-	case '+': tok = newToken(token.Op_Plus, l.ch)
-	case '-': tok = newToken(token.Op_Minus, l.ch)
-	case '*': tok = newToken(token.Op_Multiply, l.ch)
-	case '/': tok = newToken(token.Op_Divide, l.ch)
-	case '>': tok = newToken(token.Op_Greater, l.ch)
-	case ',': tok = newToken(token.Sep_Comma, l.ch)
-	case '(': tok = newToken(token.Sep_LParen, l.ch)
-	case ')': tok = newToken(token.Sep_RParen, l.ch)
-	case '"': // Обработка строк
+	case 0:
+		tok = token.Token{Type: token.EOF, Literal: ""}
+	case ';':
+		tok = newToken(token.SEMICOLON, l.ch)
+	case ',':
+		tok = newToken(token.Sep_Comma, l.ch)
+	case '(':
+		tok = newToken(token.Sep_LParen, l.ch)
+	case ')':
+		tok = newToken(token.Sep_RParen, l.ch)
+	case '{':
+		tok = newToken(token.Sep_LBrace, l.ch)
+	case '}':
+		tok = newToken(token.Sep_RBrace, l.ch)
+	case '[':
+		tok = newToken(token.Sep_LBracket, l.ch)
+	case ']':
+		tok = newToken(token.Sep_RBracket, l.ch)
+	case ':':
+		tok = newToken(token.Op_Colon, l.ch)
+	case '+':
+		tok = newToken(token.Op_Plus, l.ch)
+	case '-':
+		tok = newToken(token.Op_Minus, l.ch)
+	case '*':
+		tok = newToken(token.Op_Multiply, l.ch)
+	case '/':
+		tok = newToken(token.Op_Divide, l.ch)
+	case '!':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			lit := string(ch) + string(l.ch)
+			tok = token.Token{Type: token.Op_NotEqual, Literal: lit}
+		} else {
+			tok = newToken(token.Op_Bang, l.ch)
+		}
+	case '=':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			lit := string(ch) + string(l.ch)
+			tok = token.Token{Type: token.Op_Equal, Literal: lit}
+		} else {
+			tok = newToken(token.Op_Assign, l.ch)
+		}
+	case '<':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			lit := string(ch) + string(l.ch)
+			tok = token.Token{Type: token.Op_LessEq, Literal: lit}
+		} else {
+			tok = newToken(token.Op_Less, l.ch)
+		}
+	case '>':
+		if l.peekChar() == '=' {
+			ch := l.ch
+			l.readChar()
+			lit := string(ch) + string(l.ch)
+			tok = token.Token{Type: token.Op_GreaterEq, Literal: lit}
+		} else {
+			tok = newToken(token.Op_Greater, l.ch)
+		}
+	case '"':
 		tok.Type = token.StringLiteral
 		tok.Literal = l.readString()
-	// Конец файла
-	case 0:
-		tok.Literal = ""
-		tok.Type = token.EOF
-	// Если символ не опознан 
 	default:
 		if isLetter(l.ch) {
-			tok.Literal = l.readIdentifier()
-			tok.Type = token.Identifier
+			literal := l.readIdentifier()
+			tok.Type = LookupIdent(literal)
+			tok.Literal = literal
 			return tok
 		} else if unicode.IsDigit(l.ch) {
 			tok.Type = token.IntLiteral
@@ -89,56 +205,4 @@ func (l *Lexer) NextToken() token.Token {
 
 	l.readChar()
 	return tok
-}
-
-// readString читает все символы до закрывающей кавычки
-func (l *Lexer) readString() string {
-	position := l.position + 1
-	for {
-		l.readChar()
-		// Останавливаемся, если встретили кавычку или конец файла
-		if l.ch == '"' || l.ch == 0 {
-			break
-		}
-	}
-	return string(l.input[position:l.position])
-}
-
-func (l *Lexer) skipWhitespace() {
-	for {
-		if unicode.IsSpace(l.ch) {
-			l.readChar()
-		} else if l.ch == '/' && l.peekChar() == '/' { // <-- ИСПРАВЛЕНИЕ: Правильная обработка комментариев
-			for l.ch != '\n' && l.ch != 0 {
-				l.readChar()
-			}
-		} else {
-			break
-		}
-	}
-}
-
-// остальные вспомогательные функции 
-func (l *Lexer) readIdentifier() string {
-	position := l.position
-	for isLetter(l.ch) {
-		l.readChar()
-	}
-	return string(l.input[position:l.position])
-}
-
-func isLetter(ch rune) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || unicode.IsLetter(ch)
-}
-
-func (l *Lexer) readNumber() string {
-	position := l.position
-	for unicode.IsDigit(l.ch) {
-		l.readChar()
-	}
-	return string(l.input[position:l.position])
-}
-
-func newToken(tokenType token.TokenType, ch rune) token.Token {
-	return token.Token{Type: tokenType, Literal: string(ch)}
 }

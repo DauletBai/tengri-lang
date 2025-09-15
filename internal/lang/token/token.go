@@ -1,5 +1,10 @@
-// 03_compiler_go/token/token.go
+// FILE: internal/lang/token/token.go
+// Purpose: Token types for Tengri language with Kazakh keywords and operator set.
+// Notes: Keep token names stable across lexer/parser/evaluator.
+
 package token
+
+import "fmt"
 
 type TokenType string
 
@@ -8,51 +13,60 @@ type Token struct {
 	Literal string
 }
 
-const (
-	ILLEGAL = "ILLEGAL"
-	EOF     = "EOF"
-	ARROW     = "ARROW"    
-    SEMICOLON = "SEMICOLON"
+func (t Token) String() string {
+	return fmt.Sprintf("Token{Type:%s, Literal:`%s`}", t.Type, t.Literal)
+}
 
-	// Идентификаторы и Литералы
-	Identifier = "Identifier"
-	IntLiteral = "IntLiteral"
+// Token constants.
+const (
+	// Special
+	ILLEGAL   = "ILLEGAL"
+	EOF       = "EOF"
+	SEMICOLON = "SEMICOLON"
+
+	// Identifiers & literals
+	Identifier    = "Identifier"
+	IntLiteral    = "IntLiteral"
 	StringLiteral = "StringLiteral"
 
-	// Руны-Ключевые слова
-	Runa_Func_Def = "Π"
-	Runa_Var      = "—"
-	Runa_Const    = "Λ"
-	Runa_If       = "Y"
-	Runa_True     = "Q"
-	Runa_False    = "I"
-	Runa_Loop     = "↻"
-	Runa_Return   = "→"
-	Runa_Log      = "⁞"
+	// Keywords (Kazakh)
+	JASA   = "jasa"     // let
+	BEKIT  = "bekit"    // set/update
+	ATQARM = "atqar'm"  // function
+	QAITAR = "qaıtar"   // return
+	EGER   = "eger"     // if
+	AITPECE= "áıtpece"  // else
+	AZIRSHE= "ázirshe"  // while / for-now (reserved)
+	JAN    = "jan"      // true
+	JYN    = "j'n"      // false
+	KORSET = "kórset"   // print (builtin)
+	SAN    = "san"      // type: integer
+	BOLSHEK= "bólshek"  // type: float (reserved)
+	JOL    = "jol"      // string
+	TANBA  = "tańba"    // rune/char (reserved)
+	AQIQAT = "aqıqat"   // type: boolean
+	JYIM   = "j'i'm"    // array
 
-	// Руны-Типы
-	Runa_Type_Int        = "□"
-	Runa_Type_Float      = "⊡"
-	Runa_Type_Str        = "∞"
-	Runa_Type_Char       = "◇"
-	Runa_Type_Collection = "≡"
-
-	// Операторы
-	Op_Assign    = ":"
+	// Operators
+	Op_Assign    = "="
+	Op_Colon     = ":"
 	Op_Plus      = "+"
 	Op_Minus     = "-"
 	Op_Multiply  = "*"
 	Op_Divide    = "/"
 	Op_Equal     = "=="
-	Op_Access_At = "@"
-	Op_Get_Size  = "#"
-	Op_In        = "∈"
-	Op_Push      = "←"
-	Op_Greater 	 = ">"
+	Op_NotEqual  = "!="
+	Op_Less      = "<"
+	Op_LessEq    = "<="
+	Op_Greater   = ">"
+	Op_GreaterEq = ">="
+	Op_Bang      = "!"
 
-	// Разделители
+	// Delimiters
 	Sep_LParen   = "("
 	Sep_RParen   = ")"
+	Sep_LBrace   = "{"
+	Sep_RBrace   = "}"
 	Sep_LBracket = "["
 	Sep_RBracket = "]"
 	Sep_Comma    = ","
