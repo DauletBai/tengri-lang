@@ -1,9 +1,0 @@
-Π fib (□ n) (
-  Y (n < 2) (
-    → n
-  )
-  → fib(n - 1) + fib(n - 2)
-)
-
-Λ result : fib(__N__)
-⁞ result

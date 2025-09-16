@@ -1,0 +1,3 @@
+impl,task,n,reps,time_ns_avg
+c,sort,100000,5,625800
+c,fib_iter,100000,5,0

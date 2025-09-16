@@ -1,256 +1,122 @@
-// FILE: internal/aotminic/transpiler.go
-// Purpose: Minimal AOT "mini-C" transpiler for demo benches.
-// Supported demo basenames:
-//   - fib_iter_cli.tgr   => iterative fibonacci
-//   - fib_rec_cli.tgr    => recursive fibonacci
-//   - sort_cli.tgr       => sort via qsort (baseline)
-//   - sort_cli_m.tgr     => sort via stable mergesort (reference)
-// Any other name -> error (unless 'force' is true, falls back to fib_iter).
-
 package aotminic
 
-import (
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-)
+// C code templates for AOT compilation demos.
+// These templates now also follow the best practice of separating logic into functions.
 
-func TranspileToC(srcPath, outC string, force bool) error {
-	if srcPath == "" || outC == "" {
-		return errors.New("srcPath and outC are required")
-	}
-	mode := detectMode(strings.ToLower(filepath.Base(srcPath)), force)
-	if mode == "" {
-		return fmt.Errorf("unsupported AOT demo source: %s", srcPath)
-	}
-	var csrc string
-	switch mode {
-	case "fib_iter":
-		csrc = cFibIter()
-	case "fib_rec":
-		csrc = cFibRec()
-	case "sort_qsort":
-		csrc = cSortQsort()
-	case "sort_msort":
-		csrc = cSortMerge()
-	default:
-		return fmt.Errorf("internal mode error: %s", mode)
-	}
-	if err := os.WriteFile(outC, []byte(csrc), 0o644); err != nil {
-		return fmt.Errorf("write C failed: %w", err)
-	}
-	return nil
-}
-
-func detectMode(base string, force bool) string {
-	switch base {
-	case "fib_iter_cli.tgr":
-		return "fib_iter"
-	case "fib_rec_cli.tgr":
-		return "fib_rec"
-	case "sort_cli.tgr":
-		return "sort_qsort"
-	case "sort_cli_m.tgr":
-		return "sort_msort"
-	default:
-		if force {
-			return "fib_iter"
-		}
-		return ""
-	}
-}
-
-func cFibIter() string {
-	return `#include <stdint.h>
-#include <stdio.h>
+const FibIterC = `
 #include "runtime.h"
 
-// iterative fibonacci
-static long fib_iter(long n) {
-    long a = 0, b = 1;
-    for (long i = 0; i < n; i++) {
-        long tmp = a + b;
+long long run_fib_iter(int n) {
+    if (n < 2) { return n; }
+    long long a = 0, b = 1;
+    for (int i = 2; i <= n; i++) {
+        long long temp = a + b;
         a = b;
-        b = tmp;
+        b = temp;
     }
-    return a;
+    return b;
 }
 
 int main(int argc, char** argv) {
-    long n = tgr_argi(argc, argv, 1, 45);
-    int64_t reps = tgr_bench_reps();
-    (void)fib_iter(10); // warmup
-
-    int64_t t0 = tgr_time_ns();
-    long res = 0;
-    for (int64_t i = 0; i < reps; i++) res = fib_iter(n);
-    int64_t t1 = tgr_time_ns();
-
-    int64_t total = (t1 - t0);
-    int64_t avg   = (reps > 0 ? total / reps : total);
-
-    // Unified one-line report for CSV
-    printf("REPORT impl=tengri-aot task=fib_iter n=%ld reps=%lld time_ns_avg=%lld result=%ld\n",
-        n, (long long)reps, (long long)avg, res);
+    int n = get_n(argc, argv, 45);
+    TIME_IT_NS(
+        (void)run_fib_iter(n);,
+        "fib_iter_tengri_aot",
+        n
+    );
     return 0;
 }
 `
-}
 
-func cFibRec() string {
-	return `#include <stdint.h>
-#include <stdio.h>
+const FibRecC = `
 #include "runtime.h"
 
-// recursive fibonacci
-static long fib_rec(long n) {
-    if (n < 2) return n;
-    return fib_rec(n-1) + fib_rec(n-2);
+long long fib(int n) {
+    if (n < 2) { return n; }
+    return fib(n-1) + fib(n-2);
 }
 
 int main(int argc, char** argv) {
-    long n = tgr_argi(argc, argv, 1, 35);
-    int64_t reps = tgr_bench_reps();
-    (void)fib_rec(10); // warmup
-
-    int64_t t0 = tgr_time_ns();
-    long res = 0;
-    for (int64_t i = 0; i < reps; i++) res = fib_rec(n);
-    int64_t t1 = tgr_time_ns();
-
-    int64_t total = (t1 - t0);
-    int64_t avg   = (reps > 0 ? total / reps : total);
-
-    printf("REPORT impl=tengri-aot task=fib_rec n=%ld reps=%lld time_ns_avg=%lld result=%ld\n",
-        n, (long long)reps, (long long)avg, res);
+    int n = get_n(argc, argv, 35);
+    TIME_IT_NS(
+        (void)fib(n);,
+        "fib_rec_tengri_aot",
+        n
+    );
     return 0;
 }
 `
-}
 
-func cSortQsort() string {
-	return `#include <stdint.h>
-#include <stdio.h>
+const SortQSortC = `
+#include "runtime.h"
 #include <stdlib.h>
-#include "runtime.h"
 
-static int cmp_int(const void* a, const void* b) {
-    int ia = *(const int*)a, ib = *(const int*)b;
-    return (ia > ib) - (ia < ib);
+int compare(const void *a, const void *b) {
+    return (*(int*)a - *(int*)b);
+}
+
+void run_qsort(int n, int* arr) {
+    qsort(arr, n, sizeof(int), compare);
 }
 
 int main(int argc, char** argv) {
-    long n = tgr_argi(argc, argv, 1, 100000);
-    if (n <= 0) n = 1;
-    int64_t reps = tgr_bench_reps();
-
-    int* arr = (int*)malloc(sizeof(int) * (size_t)n);
-    if (!arr) { fprintf(stderr, "alloc failed\n"); return 1; }
-
-    // warm-up
-    for (long i = 0; i < n; i++) arr[i] = (int)(n - i);
-    qsort(arr, (size_t)n, sizeof(int), cmp_int);
-
-    int64_t t0 = tgr_time_ns();
-    for (int64_t r = 0; r < reps; r++) {
-        for (long i = 0; i < n; i++) arr[i] = (int)(n - i);
-        qsort(arr, (size_t)n, sizeof(int), cmp_int);
-    }
-    int64_t t1 = tgr_time_ns();
-
-    long long sum = 0;
-    for (long i = 0; i < n; i++) sum += arr[i];
-    int first = arr[0], last = arr[n-1];
-
-    int64_t total = (t1 - t0);
-    int64_t avg   = (reps > 0 ? total / reps : total);
-
-    printf("REPORT impl=tengri-aot task=sort-qsort n=%ld reps=%lld time_ns_avg=%lld first=%d last=%d sum=%lld\n",
-        n, (long long)reps, (long long)avg, first, last, sum);
-
+    int n = get_n(argc, argv, 100000);
+    int* arr = create_array(n);
+    TIME_IT_NS(
+        run_qsort(n, arr);,
+        "sort_qsort_tengri_aot",
+        n
+    );
     free(arr);
     return 0;
 }
 `
-}
 
-func cSortMerge() string {
-	return `#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+const SortMergeSortC = `
 #include "runtime.h"
+#include <stdlib.h>
 
-// NOTE: avoid clash with system 'mergesort' symbol on macOS by using tgr_* names.
-
-// Stable mergesort for int
-static void tgr_merge(int* a, int* buf, long l, long m, long r) {
-    long i=l, j=m, k=l;
-    while (i<m && j<r) {
-        if (a[i] <= a[j]) buf[k++] = a[i++];
-        else              buf[k++] = a[j++];
+void merge(int arr[], int l, int m, int r) {
+    int i, j, k;
+    int n1 = m - l + 1;
+    int n2 = r - m;
+    int *L = malloc(n1 * sizeof(int));
+    int *R = malloc(n2 * sizeof(int));
+    for (i = 0; i < n1; i++) L[i] = arr[l + i];
+    for (j = 0; j < n2; j++) R[j] = arr[m + 1 + j];
+    i = 0; j = 0; k = l;
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) arr[k++] = L[i++];
+        else arr[k++] = R[j++];
     }
-    while (i<m) buf[k++] = a[i++];
-    while (j<r) buf[k++] = a[j++];
-    for (long t=l; t<r; t++) a[t] = buf[t];
+    while (i < n1) arr[k++] = L[i++];
+    while (j < n2) arr[k++] = R[j++];
+    free(L);
+    free(R);
 }
 
-static void tgr_mergesort_rec(int* a, int* buf, long l, long r) {
-    if (r - l <= 32) { // small insertion sort
-        for (long i=l+1; i<r; i++) {
-            int x = a[i]; long j = i-1;
-            while (j>=l && a[j] > x) { a[j+1] = a[j]; j--; }
-            a[j+1] = x;
-        }
-        return;
+void mergeSort(int arr[], int l, int r) {
+    if (l < r) {
+        int m = l + (r - l) / 2;
+        mergeSort(arr, l, m);
+        mergeSort(arr, m + 1, r);
+        merge(arr, l, m, r);
     }
-    long m = l + (r - l)/2;
-    tgr_mergesort_rec(a, buf, l, m);
-    tgr_mergesort_rec(a, buf, m, r);
-    if (a[m-1] <= a[m]) return; // already sorted
-    tgr_merge(a, buf, l, m, r);
 }
 
-static void tgr_mergesort(int* a, long n) {
-    int* buf = (int*)malloc(sizeof(int)*(size_t)n);
-    if (!buf) return;
-    tgr_mergesort_rec(a, buf, 0, n);
-    free(buf);
+void run_msort(int n, int* arr) {
+    mergeSort(arr, 0, n - 1);
 }
 
 int main(int argc, char** argv) {
-    long n = tgr_argi(argc, argv, 1, 100000);
-    if (n <= 0) n = 1;
-    int64_t reps = tgr_bench_reps();
-
-    int* arr = (int*)malloc(sizeof(int) * (size_t)n);
-    if (!arr) { fprintf(stderr, "alloc failed\n"); return 1; }
-
-    // warm-up
-    for (long i = 0; i < n; i++) arr[i] = (int)(n - i);
-    tgr_mergesort(arr, n);
-
-    int64_t t0 = tgr_time_ns();
-    for (int64_t r = 0; r < reps; r++) {
-        for (long i = 0; i < n; i++) arr[i] = (int)(n - i);
-        tgr_mergesort(arr, n);
-    }
-    int64_t t1 = tgr_time_ns();
-
-    long long sum = 0;
-    for (long i = 0; i < n; i++) sum += arr[i];
-    int first = arr[0], last = arr[n-1];
-
-    int64_t total = (t1 - t0);
-    int64_t avg   = (reps > 0 ? total / reps : total);
-
-    printf("REPORT impl=tengri-aot task=sort-msort n=%ld reps=%lld time_ns_avg=%lld first=%d last=%d sum=%lld\n",
-        n, (long long)reps, (long long)avg, first, last, sum);
-
+    int n = get_n(argc, argv, 100000);
+    int* arr = create_array(n);
+    TIME_IT_NS(
+        run_msort(n, arr);,
+        "sort_msort_tengri_aot",
+        n
+    );
     free(arr);
     return 0;
 }
 `
-}
