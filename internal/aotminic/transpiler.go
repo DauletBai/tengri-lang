@@ -1,10 +1,12 @@
+// FILE: internal/aotminic/transpiler.go
+
 package aotminic
 
 // C code templates for AOT compilation demos.
-// These templates now also follow the best practice of separating logic into functions.
 
 const FibIterC = `
 #include "runtime.h"
+#include <time.h> // Required for manual timing
 
 long long run_fib_iter(int n) {
     if (n < 2) { return n; }
@@ -18,15 +20,29 @@ long long run_fib_iter(int n) {
 }
 
 int main(int argc, char** argv) {
-    int n = get_n(argc, argv, 45);
-    TIME_IT_NS(
-        (void)run_fib_iter(n);,
-        "fib_iter_tengri_aot",
-        n
-    );
+    int n = get_n(argc, argv, 90);
+    int inner_reps = 10000;
+
+    // CORRECTED: Manual timing to calculate the average per operation.
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    for (int i = 0; i < inner_reps; i++) {
+        volatile long long result = run_fib_iter(n);
+        (void)result;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    long long total_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
+    long long avg_ns = total_ns / inner_reps; // The crucial division step.
+
+    printf("TASK=fib_iter_tengri_aot,N=%d,TIME_NS=%lld\n", n, avg_ns);
+    
     return 0;
 }
 `
+
+// ... (остальные шаблоны FibRecC, SortQSortC, SortMergeSortC остаются без изменений) ...
 
 const FibRecC = `
 #include "runtime.h"
