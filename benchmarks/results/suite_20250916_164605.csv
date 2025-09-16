@@ -1,0 +1,14 @@
+impl,task,n,reps,time_ns_avg
+c,sort,100000,5,575400
+c,fib_iter,90,5,0
+c,fib_rec,35,5,43211000
+go,sort,100000,5,108425
+go,fib_iter,90,5,4683
+go,fib_rec,35,5,49607183
+rust,sort,100000,5,1625991
+rust,fib_iter,90,5,149
+rust,fib_rec,35,5,44398266
+tengri-aot,sort_qsort,100000,5,572400
+tengri-aot,sort_msort,100000,5,13645200
+tengri-aot,fib_iter,90,5,0
+tengri-aot,fib_rec,35,5,43367600
