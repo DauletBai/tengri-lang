@@ -1,6 +1,4 @@
 // FILE: internal/lang/token/token.go
-// Purpose: Token types for Tengri language with Kazakh keywords and operator set.
-// Notes: Keep token names stable across lexer/parser/evaluator.
 
 package token
 
@@ -17,57 +15,53 @@ func (t Token) String() string {
 	return fmt.Sprintf("Token{Type:%s, Literal:`%s`}", t.Type, t.Literal)
 }
 
-// Token constants.
+// All token types are now based on the tenge language keywords.
 const (
-	// Special
-	ILLEGAL   = "ILLEGAL"
-	EOF       = "EOF"
-	SEMICOLON = "SEMICOLON"
+	// Special Tokens
+	ILLEGAL = "ILLEGAL" // Represents a token we don't know
+	EOF     = "EOF"     // End of File
 
-	// Identifiers & literals
-	Identifier    = "Identifier"
-	IntLiteral    = "IntLiteral"
-	StringLiteral = "StringLiteral"
+	// Identifiers & Literals
+	IDENT     = "IDENT"      // a, myVar, etc.
+	SAN_LIT   = "SAN_LIT"    // 123
+	AQSHA_LIT = "AQSHA_LIT"  // 12.34
+	JOL_LIT   = "JOL_LIT"    // "hello"
 
-	// Keywords (Kazakh)
-	JASA   = "jasa"     // let
-	BEKIT  = "bekit"    // set/update
-	ATQARM = "atqar'm"  // function
-	QAITAR = "qaıtar"   // return
-	EGER   = "eger"     // if
-	AITPECE= "áıtpece"  // else
-	AZIRSHE= "ázirshe"  // while / for-now (reserved)
-	JAN    = "jan"      // true
-	JYN    = "j'n"      // false
-	KORSET = "kórset"   // print (builtin)
-	SAN    = "san"      // type: integer
-	BOLSHEK= "bólshek"  // type: float (reserved)
-	JOL    = "jol"      // string
-	TANBA  = "tańba"    // rune/char (reserved)
-	AQIQAT = "aqıqat"   // type: boolean
-	JYIM   = "j'i'm"    // array
+	// Keywords
+	JASA    = "jasa"
+	BEKIT   = "bekit"
+	ATQARM  = "atqar'm"
+	QAITAR  = "qaıtar"
+	EGER    = "eger"
+	AITPECE = "áıtpece"
+	AZIRSHE = "ázirshe"
+	JAN     = "jan"
+	JYN     = "j'n"
+	KORSET  = "kórset"
+
+	// Types
+	SAN    = "san"
+	AQSHA  = "aqsha"
+	JOL    = "jol"
+	TANBA  = "tańba"
+	AQIQAT = "aqıqat"
+	JYIM   = "j'i'm"
 
 	// Operators
-	Op_Assign    = "="
-	Op_Colon     = ":"
-	Op_Plus      = "+"
-	Op_Minus     = "-"
-	Op_Multiply  = "*"
-	Op_Divide    = "/"
-	Op_Equal     = "=="
-	Op_NotEqual  = "!="
-	Op_Less      = "<"
-	Op_LessEq    = "<="
-	Op_Greater   = ">"
-	Op_GreaterEq = ">="
-	Op_Bang      = "!"
+	ASSIGN    = "="
+	PLUS      = "+"
+	MINUS     = "-"
+	MULTIPLY  = "*"
+	DIVIDE    = "/"
+	EQUAL     = "=="
+	GREATER   = ">"
 
 	// Delimiters
-	Sep_LParen   = "("
-	Sep_RParen   = ")"
-	Sep_LBrace   = "{"
-	Sep_RBrace   = "}"
-	Sep_LBracket = "["
-	Sep_RBracket = "]"
-	Sep_Comma    = ","
+	COMMA     = ","
+	COLON     = ":"
+	LPAREN    = "("
+	RPAREN    = ")"
+	LBRACKET  = "["
+	RBRACKET  = "]"
+	ARROW     = "->"
 )

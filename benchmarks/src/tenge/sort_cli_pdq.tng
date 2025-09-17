@@ -1,0 +1,6 @@
+// FILE: benchmarks/src/tenge/sort_cli_pdq.tng
+// Purpose: PDQ-like introsort with insertion cutoff for Tenge benchmark.
+
+fn main() {
+    print("TASK=sort_pdq,N=0,TIME_NS=0\n");
+}

@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     long long total_ns = (end.tv_sec - start.tv_sec) * 1000000000LL + (end.tv_nsec - start.tv_nsec);
     long long avg_ns = total_ns / inner_reps; // The crucial division step.
 
-    printf("TASK=fib_iter_tengri_aot,N=%d,TIME_NS=%lld\n", n, avg_ns);
+    printf("TASK=fib_iter_tenge_aot,N=%d,TIME_NS=%lld\n", n, avg_ns);
     
     return 0;
 }
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     int n = get_n(argc, argv, 35);
     TIME_IT_NS(
         (void)fib(n);,
-        "fib_rec_tengri_aot",
+        "fib_rec_tenge_aot",
         n
     );
     return 0;
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
     int* arr = create_array(n);
     TIME_IT_NS(
         run_qsort(n, arr);,
-        "sort_qsort_tengri_aot",
+        "sort_qsort_tenge_aot",
         n
     );
     free(arr);
@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
     int* arr = create_array(n);
     TIME_IT_NS(
         run_msort(n, arr);,
-        "sort_msort_tengri_aot",
+        "sort_msort_tenge_aot",
         n
     );
     free(arr);

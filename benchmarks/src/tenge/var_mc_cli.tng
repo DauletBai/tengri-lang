@@ -1,0 +1,129 @@
+// FILE: benchmarks/src/tenge/var_mc_cli.tng
+// Purpose: Monte Carlo VaR benchmark (GBM, Box–Muller, xorshift64*), CLI output.
+// Output format: TASK=var_mc,N=<N>,TIME_NS=<elapsed>,VAR=<value>
+
+fn u64_xs_seed(seed: u64) -> u64 {
+    // return non-zero seed
+    if seed == 0 { return 0x9E3779B97F4A7C15; }
+    return seed;
+}
+
+fn u64_xs_next(state_ptr: &u64) -> u64 {
+    // xorshift64*
+    var x: u64 = *state_ptr;
+    x = x ^ (x >> 12);
+    x = x ^ (x << 25);
+    x = x ^ (x >> 27);
+    *state_ptr = x;
+    return x * 0x2545F4914F6CDD1D;
+}
+
+fn uniform01(state_ptr: &u64) -> f64 {
+    // 53-bit mantissa uniform in [0,1)
+    var u: u64 = u64_xs_next(state_ptr) >> 11;
+    return f64(u) * (1.0 / 9007199254740992.0);
+}
+
+fn normal01(state_ptr: &u64) -> f64 {
+    // Box–Muller (polar or classic)
+    var u1: f64 = uniform01(state_ptr);
+    if u1 < 1e-300 { u1 = 1e-300; }
+    var u2: f64 = uniform01(state_ptr);
+    return sqrt(-2.0 * ln(u1)) * cos(2.0 * PI * u2);
+}
+
+fn quickselect_kth(a: []f64, n: i32, k: i32) -> f64 {
+    // In-place Quickselect (k-th smallest, 0-based)
+    var left: i32 = 0;
+    var right: i32 = n - 1;
+    var kk: i32 = k;
+
+    while true {
+        if left == right { return a[left]; }
+
+        var pivot: f64 = a[(left + right) / 2];
+        var i: i32 = left;
+        var j: i32 = right;
+
+        while i <= j {
+            while a[i] < pivot { i = i + 1; }
+            while a[j] > pivot { j = j - 1; }
+            if i <= j {
+                var tmp: f64 = a[i];
+                a[i] = a[j];
+                a[j] = tmp;
+                i = i + 1;
+                j = j - 1;
+            }
+        }
+        if kk <= j {
+            right = j;
+        } else if kk >= i {
+            left = i;
+        } else {
+            return a[kk];
+        }
+    }
+}
+
+fn quantile_right_tail_var(loss: []f64, n: i32, alpha: f64) -> f64 {
+    // VaR at confidence alpha uses (1 - alpha) tail probability of losses.
+    // We want the value q such that P(Loss >= q) = 1 - alpha.
+    // Equivalent index (ascending): idx = ceil(alpha * n) - 1.
+    var fidx: f64 = alpha * f64(n);
+    var idx: i32 = i32(floor(fidx));
+    if idx < 0 { idx = 0; }
+    if idx >= n { idx = n - 1; }
+    return quickselect_kth(loss, n, idx);
+}
+
+fn main() {
+    // Parse args: N, steps, alpha
+    var N: i32 = argi(1, 1000000);
+    var steps: i32 = argi(2, 1);
+    var alpha: f64 = argf(3, 0.99);
+
+    // Model params
+    var S0: f64 = 100.0;
+    var mu: f64 = 0.05;
+    var sigma: f64 = 0.20;
+    var T: f64 = f64(steps) / 252.0;
+    var dt: f64 = T / f64(steps);
+
+    // Allocate losses
+    var loss: []f64 = make_f64(N);
+
+    // RNG seed
+    var state: u64 = u64_xs_seed(123456789);
+
+    var t0: i64 = now_ns();
+
+    var i: i32 = 0;
+    while i < N {
+        var S: f64 = S0;
+        var k: i32 = 0;
+        while k < steps {
+            var z: f64 = normal01(&state);
+            var drift: f64 = (mu - 0.5 * sigma * sigma) * dt;
+            var diff: f64 = sigma * sqrt(dt) * z;
+            S = S * exp(drift + diff);
+            k = k + 1;
+        }
+        var pnl: f64 = S - S0;
+        loss[i] = -pnl; // positive loss
+        i = i + 1;
+    }
+
+    var var_val: f64 = quantile_right_tail_var(loss, N, 1.0 - (1.0 - alpha)); // alpha-quantile
+
+    var t1: i64 = now_ns();
+    var elapsed: i64 = t1 - t0;
+
+    print("TASK=var_mc,N=");
+    printi(N);
+    print(",TIME_NS=");
+    printi(elapsed);
+    print(",VAR=");
+    printf(var_val, 6);
+    print("\n");
+}

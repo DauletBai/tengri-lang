@@ -293,7 +293,7 @@ func targetsFor(kind string) []Target {
 	// AOT
 	if kind == "iter" {
 		t = append(t, Target{
-			Name: "tengri-aot",
+			Name: "tenge-aot",
 			Kind: "iter",
 			Bin:  ".bin/fib_cli",
 			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
@@ -302,7 +302,7 @@ func targetsFor(kind string) []Target {
 		})
 	} else {
 		t = append(t, Target{
-			Name: "tengri-aot",
+			Name: "tenge-aot",
 			Kind: "rec",
 			Bin:  ".bin/fib_rec_cli",
 			ArgsFn: func(n int) []string { return []string{fmt.Sprintf("%d", n)} },
@@ -356,7 +356,7 @@ func targetsFor(kind string) []Target {
 	// Stable order in output
 	sort.SliceStable(t, func(i, j int) bool {
 		order := map[string]int{
-			"go": 0, "vm": 1, "tengri-aot": 2, "c": 3, "rust": 4,
+			"go": 0, "vm": 1, "tenge-aot": 2, "c": 3, "rust": 4,
 		}
 		return order[t[i].Name] < order[t[j].Name]
 	})

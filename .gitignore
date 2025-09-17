@@ -7,7 +7,7 @@
 *.test
 *.out
 coverage.*
-# go workspaces (если появится)
+# go workspaces 
 go.work
 go.work.sum
 
@@ -15,12 +15,9 @@ go.work.sum
 .bin/
 
 # ---- AOT-generated C and objects -------------------------------------------
-# общий случай
 *.o
 *.a
 *.so
-# сгенерированные C-файлы (держим исходники, игнорим эмит)
-# если вы генерите не только в .bin, можно игнорить по шаблонам:
 .bin/*.c
 **/fib_*_cli.c
 

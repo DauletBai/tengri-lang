@@ -1,7 +1,7 @@
 // FILE: internal/aotminic/runtime/runtime.h
 
-#ifndef TENGRI_RUNTIME_H
-#define TENGRI_RUNTIME_H
+#ifndef tenge_RUNTIME_H
+#define tenge_RUNTIME_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,4 +25,4 @@ int* create_array(int n);
         printf("TASK=%s,N=%d,TIME_NS=%lld\n", task_name, n, time_ns);         \
     } while (0)
 
-#endif // TENGRI_RUNTIME_H
+#endif // tenge_RUNTIME_H

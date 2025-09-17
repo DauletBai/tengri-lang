@@ -1,130 +1,92 @@
 // FILE: internal/lang/object/object.go
-// Purpose: Runtime object system for Tengri with arrays and builtins; Kazakh boolean Inspect.
 
 package object
 
 import (
-	"bytes"
 	"fmt"
-	//"strings"
-
-	//"github.com/DauletBai/tengri-lang/internal/lang/ast"
+	//"github.com/DauletBai/tenge/internal/lang/ast"
+	"github.com/shopspring/decimal"
 )
 
+// ObjectType is a string representation of an object's type.
 type ObjectType string
 
+// All object types are now based on the tenge language keywords.
 const (
-	INTEGER = "INTEGER"
-	BOOLEAN = "BOOLEAN"
-	ARRAY   = "ARRAY"
-	NULL_OBJ    = "NULL"
-	ERROR   = "ERROR"
-	BUILTIN = "BUILTIN"
+	SAN_OBJ    = "SAN"
+	AQSHA_OBJ  = "AQSHA"
+	AQIQAT_OBJ = "AQIQAT"
+	NULL_OBJ   = "NULL"
+	QAITAR_VAL = "QAITAR_VAL"
+	ERROR_OBJ  = "ERROR"
 )
 
+// Singleton instances for common values, named after the language's philosophy.
+var (
+	NULL = &Null{}
+	JAN  = &Aqıqat{Value: true}  // "jan" - soul, represents truth
+	JYN  = &Aqıqat{Value: false} // "j'n" - demon, represents falsehood
+)
+
+// Object is the interface that every value in tenge will implement.
 type Object interface {
 	Type() ObjectType
 	Inspect() string
 }
 
-// --- Primitives ---
+// --- Object Structs ---
 
-type Integer struct { 
-	Value int64 
+// San represents an integer object.
+type San struct {
+	Value int64
 }
+func (s *San) Type() ObjectType { return SAN_OBJ }
+func (s *San) Inspect() string  { return fmt.Sprintf("%d", s.Value) }
 
-func (i *Integer) Type() ObjectType   { return INTEGER }
-func (i *Integer) Inspect() string    { return fmt.Sprintf("%d", i.Value) }
-
-type Boolean struct { 
-	Value bool 
+// Aqsha represents a decimal object for financial calculations.
+type Aqsha struct {
+	Value decimal.Decimal
 }
+func (a *Aqsha) Type() ObjectType { return AQSHA_OBJ }
+func (a *Aqsha) Inspect() string  { return a.Value.String() }
 
-func (b *Boolean) Type() ObjectType   { return BOOLEAN }
-func (b *Boolean) Inspect() string    { if b.Value { return "jan" } ; return "j'n" }
-
-type Null struct{}
-func (n *Null) Type() ObjectType      { return NULL_OBJ }
-func (n *Null) Inspect() string       { return "" }
-
-// --- Composite ---
-
-type Array struct { 
-	Elements []Object 
+// Aqıqat represents a boolean object.
+type Aqıqat struct {
+	Value bool
 }
-
-func (a *Array) Type() ObjectType     { return ARRAY }
-func (a *Array) Inspect() string {
-	var out bytes.Buffer
-	out.WriteString("[")
-	for i, e := range a.Elements {
-		if i > 0 { out.WriteString(", ") }
-		out.WriteString(e.Inspect())
+func (a *Aqıqat) Type() ObjectType { return AQIQAT_OBJ }
+func (a *Aqıqat) Inspect() string {
+	if a.Value {
+		return "jan"
 	}
-	out.WriteString("]")
-	return out.String()
+	return "j'n"
 }
 
-// --- Error ---
-type Error struct { 
-	Message string 
+// Null represents the absence of a value.
+type Null struct{}
+func (n *Null) Type() ObjectType { return NULL_OBJ }
+func (n *Null) Inspect() string  { return "null" }
+
+// QaıtarValue is a wrapper to handle return values.
+type QaıtarValue struct {
+	Value Object
 }
+func (qv *QaıtarValue) Type() ObjectType { return QAITAR_VAL }
+func (qv *QaıtarValue) Inspect() string  { return qv.Value.Inspect() }
 
-func (e *Error) Type() ObjectType     { return ERROR }
-func (e *Error) Inspect() string      { return "ERROR: " + e.Message }
-
-// --- Builtin ---
-type BuiltinFunction func(args ...Object) Object
-type Builtin struct { 
-	Fn BuiltinFunction 
+// Error represents a runtime error.
+type Error struct {
+	Message string
 }
-
-func (b *Builtin) Type() ObjectType   { return BUILTIN }
-func (b *Builtin) Inspect() string    { return "<builtin>" }
+func (e *Error) Type() ObjectType { return ERROR_OBJ }
+func (e *Error) Inspect() string  { return "QATE: " + e.Message } // QATE: Kazakh for Error
 
 // --- Environment ---
+
 type Environment struct {
 	store map[string]Object
 	outer *Environment
 }
-
-func NewEnvironment() *Environment {
-	return &Environment{store: make(map[string]Object)}
-}
-
-func NewEnclosedEnvironment(outer *Environment) *Environment {
-	env := NewEnvironment()
-	env.outer = outer
-	return env
-}
-
-func (e *Environment) Get(name string) (Object, bool) {
-	obj, ok := e.store[name]
-	if !ok && e.outer != nil {
-		return e.outer.Get(name)
-	}
-	return obj, ok
-}
-
-func (e *Environment) Set(name string, val Object) Object {
-	e.store[name] = val
-	return val
-}
-
-// Singletons
-var (
-	TRUE  = &Boolean{Value: true}
-	FALSE = &Boolean{Value: false}
-	NULL  = &Null{}
-)
-
-func IsTruthy(obj Object) bool {
-	switch o := obj.(type) {
-	case *Null:
-		return false
-	case *Boolean:
-		return o.Value
-	default:
-		return true
-	}
-}
+func NewEnvironment() *Environment { /* ... */ return &Environment{store: make(map[string]Object)} }
+func (e *Environment) Get(name string) (Object, bool) { /* ... */ obj, ok := e.store[name]; if !ok && e.outer != nil { obj, ok = e.outer.Get(name) }; return obj, ok }
+func (e *Environment) Set(name string, val Object) Object { /* ... */ e.store[name] = val; return val }

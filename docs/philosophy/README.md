@@ -1,6 +1,6 @@
-# The Tengri Performance Thesis
+# The tenge Performance Thesis
 
-This document serves as a technical bridge between the linguistic philosophy outlined in the book ["Tartarus & I"](./Tartarus_&_I.html) and the engineering goals of the Tengri Language Project. It explains the core hypothesis for a technical audience, free from historical or philosophical context.
+This document serves as a technical bridge between the linguistic philosophy outlined in the book ["Tartarus & I"](./Tartarus_&_I.html) and the engineering goals of the tenge Language Project. It explains the core hypothesis for a technical audience, free from historical or philosophical context.
 
 ## 1. The Problem: Inherent Inefficiencies in Modern Computing
 
@@ -12,7 +12,7 @@ For decades, the primary gains in application speed came from hardware improveme
 
 ## 2. The Hypothesis: Linguistic Clarity as Computational Clarity
 
-The core hypothesis of the Tengri project is that the structural and semantic clarity of **agglutinative languages** (such as Kazakh) can serve as a blueprint for a more efficient computing paradigm.
+The core hypothesis of the tenge project is that the structural and semantic clarity of **agglutinative languages** (such as Kazakh) can serve as a blueprint for a more efficient computing paradigm.
 
 This is not a mystical concept, but an engineering one. Agglutinative morphology works like a simple, linear state machine:
 
@@ -28,7 +28,7 @@ The Kazakh language is not the source of the *magic*; it is the source of the *m
 
 ## 3. Our Approach: The 4-Stage Performance Roadmap
 
-To test this hypothesis, we are building the Tengri language ecosystem in four distinct, measurable stages:
+To test this hypothesis, we are building the tenge language ecosystem in four distinct, measurable stages:
 
 1.  **AST Interpreter (Current):** A tree-walking interpreter written in Go. The goal of this stage is to validate the language semantics, build a working parser, and provide a functional REPL. Performance is expected to be low but should already outperform other interpreters like CPython in certain tasks due to the efficiency of the Go runtime.
 2.  **Bytecode VM (In Progress):** A register-based virtual machine. This stage translates the AST into a compact, linear bytecode format. This eliminates the overhead of walking the AST, leading to a significant performance jump (estimated 10-50x over the AST interpreter).

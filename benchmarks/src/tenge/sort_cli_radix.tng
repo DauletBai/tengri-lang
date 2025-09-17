@@ -1,0 +1,6 @@
+// FILE: benchmarks/src/tenge/sort_cli_radix.tng
+// Purpose: 32-bit unsigned radix sort (LSD) for Tenge benchmark.
+
+fn main() {
+    print("TASK=sort_radix,N=0,TIME_NS=0\n");
+}

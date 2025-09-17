@@ -1,0 +1,8 @@
+// FILE: benchmarks/src/tenge/var_mc_qsel_cli.tng
+// Purpose: Monte Carlo VaR using Ziggurat + Quickselect (O(N)) for fair compute-bound benchmark.
+// Output format: TASK=var_mc_qsel,N=<N>,TIME_NS=<elapsed>,VAR=<value>
+
+fn main() {
+    // This source is a placeholder for AOT demo routing; real C is emitted by cmd/tenge.
+    print("TASK=var_mc_qsel,N=0,TIME_NS=0,VAR=0\n");
+}

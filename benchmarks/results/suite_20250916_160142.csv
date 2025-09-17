@@ -1,4 +1,0 @@
-impl,task,n,reps,time_ns_avg
-c,sort,100000,5,626800
-c,fib_iter,90,5,0
-c,fib_rec,35,5,43718200

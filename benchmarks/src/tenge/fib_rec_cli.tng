@@ -19,5 +19,5 @@ fn main() {
   let end = time_ns();
 
   print(last);
-  print_time_ns(end - start);   // ← единый формат для benchfast
+  print_time_ns(end - start);  
 }

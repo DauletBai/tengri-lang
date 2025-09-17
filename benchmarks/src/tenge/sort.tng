@@ -1,10 +1,10 @@
-// AOT sort benchmark for Tengri (no huge literals; build the array in code)
+// AOT sort benchmark for tenge (no huge literals; build the array in code)
 // Assumptions: 
 // - int ops, comparisons, arrays, indexing and length are supported by AOT backend
 // - kórset(x) prints a number/string (adjust if your print builtin is named differently)
 // - sort(xs) returns a new sorted array (replace with your own impl if needed)
 
-// jasa SIZE : san = 100000   // Можно переопределять через окружение в обвязке, но здесь фиксируем.
+// jasa SIZE : san = 100000   
 jasa SIZE : san = 100000
 
 // build reversed array [SIZE, ..., 1]
@@ -13,27 +13,26 @@ jasa xs : j'i'm = []
 jasa val : san = 0
 jasa n : san = SIZE
 eger n > 0 {
-    // простая заполнялка без циклов "for": развернутый рекурсивный билд
     jasa build : atqar'm (m) {
         eger m == 0 { qaıtar xs }
-        bekit xs = push(xs, m)     // предполагается builtin push(arr, x) → новый массив
+        bekit xs = push(xs, m)     
         qaıtar build(m - 1)
     }
     bekit xs = build(n)
 }
 
 // timing start
-jasa t0 : san = now_ms()           // предполагается builtin now_ms() → int
+jasa t0 : san = now_ms()          
 
 // sort
-bekit ys : j'i'm = sort(xs)        // если нет builtin sort() в AOT — подменить на свою реализацию
+bekit ys : j'i'm = sort(xs)      
 
 // timing end
 jasa t1 : san = now_ms()
 jasa dt : san = t1 - t0
 
 // checksum
-jasa first : san = index(ys, 0)    // предполагается builtin index(arr, i)
+jasa first : san = index(ys, 0)    
 jasa last  : san = index(ys, len(ys)-1)
 jasa sum   : san = 0
 
@@ -44,7 +43,7 @@ jasa sacc : atqar'm (arr, k, acc) {
 bekit sum = sacc(ys, 0, 0)
 
 // print in single line (adapt print function name if needed)
-kórset("tengri_sort: n=") ; kórset(SIZE)
+kórset("tenge_sort: n=") ; kórset(SIZE)
 kórset(" first=") ; kórset(first)
 kórset(" last=") ; kórset(last)
 kórset(" sum=") ; kórset(sum)
