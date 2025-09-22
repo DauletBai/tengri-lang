@@ -32,3 +32,5 @@ Tenge уже показал результаты уровня C на `fib_iter` 
 ---
 
 Исторический прототип: [tengri-lang](https://github.com/DauletBai/tengri-lang)
+
+Link to the new [tenge](https://github.com/DauletBai/tenge) project, based on [tengri-lang](https://github.com/DauletBai/tengri-lang)

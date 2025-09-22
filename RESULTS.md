@@ -23,3 +23,5 @@
 | var_mc_qsel | tenge  |  1000000 |      3.0872e+07  |
 | var_mc_sort | tenge  |  1000000 |      1.84507e+08 |
 | var_mc_zig  | tenge  |  1000000 |      1.00724e+08 |
+
+Link to the new project [tenge](https://github.com/DauletBai/tenge) and its benchmarks [tenge](https://github.com/DauletBai/tenge/tree/main/benchmarks/results)
