@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./docs/philosophy/brand/logo.svg" alt="Tenge Logo" width="64"/>
+</p>
+
 # Tenge Programming Language
 
 **Tenge** — новый язык программирования, выросший из прототипа *tengri-lang*.  
